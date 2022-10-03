@@ -28,6 +28,7 @@ bowtie2 -x INDEX -1 READ1 -2 READ2 -S SAMOUT -k 50 --no-mixed --no-discordant -p
 ```
 *BWA*
 ```
+#BWA is not supported for paired-end processing due to constraints with multi-mapped read reporting
 #Single-end
 bwa mem -a INDEX FASTQ > SAMOUT
 ```

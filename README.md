@@ -60,6 +60,7 @@ python PATH/Allo/Allo.py ALIGNEROUTPUT_SORT.SAM -seq PAIRED_OR_SINGLE -o OUTPUTN
 | --readcount |  | CNN will not be used in allocation, only read counts |
 | --random |  | Reads will be randomly assigned (similar to Bowtie and BWA by default) |
 | -s  | any int | Seed for random number generator to keep consistency, 7 by default |
+| --ignore |  | Ignore warning about read sorting |
 
 
 ## Test files

@@ -34,7 +34,7 @@ bwa mem -a INDEX FASTQ > SAMOUT
 ```
 
 
-Finally, the output of the aligners must be sorted by read name. Additionally, you may want to use samtools view to get rid of unproperly mapped pairs. It is possible to use Allo with discordant or mixed pairs but Allo will treat them equally to proper pairs. Proceed accordingly. 
+Finally, the output of the aligners must be sorted by read name in order to use Allo. If using Bowtie1, you may want to use samtools view to get rid of unproperly mapped pairs. It is possible to use Allo with discordant or mixed pairs but Allo will treat them equally to proper pairs. Proceed accordingly. 
 ```
 samtools collate -o ALIGNEROUTPUT_SORT.SAM ALIGNEROUTPUT_FILTER.SAM
 ```
@@ -44,6 +44,10 @@ The basic command for Allo:
 ```
 python PATH/Allo/Allo.py ALIGNEROUTPUT_SORT.SAM -seq PAIRED_OR_SINGLE -o OUTPUTNAME -m MIXED_OR_NARROW_PEAKS
 ```
+See other options below.
+
+## Post-processing
+Allo adds a ZA optional tag to every read that is allocated. The number within the tag corresponds to the number of places a read/pair mapped to. In order to get only uniquely mapped reads grep could be used with the -v option. On the same note, awk can used to filter reads with a specific number of mapping locations (can also be done with the -max option within Allo).
 
 
 ## Options

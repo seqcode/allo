@@ -2,11 +2,11 @@
 ## Required imports
 Allo was written with the following imported packages. All other packages used are built into Python. Especially concerning Tensorflow, it is recommended to create a conda environment specific to this version as Allo may not function without it:
 
-joblib	0.17.0
+joblib	1.2.1
 
-numpy		1.22.1 
+numpy		1.23.3
 
-tensorflow	2.8.2
+tensorflow	2.8.1
 
 ## Pre-processing
 Using Allo requires a few pre-processing steps. In most ChIP pipelines, the default behavior of aligners is to assign multi-mapped reads to random locations within their mappings without retaining information on the other locations. Both Bowtie1/2 and BWA can be used for single-end. Unfortunately, BWA cannot be used for paired-end reads prior to Allo due to constraints in how it outputs multi-mapped reads. The following arguments should be used:

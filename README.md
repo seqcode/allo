@@ -34,7 +34,7 @@ bwa mem -a INDEX FASTQ > SAMOUT
 ```
 
 
-Finally, the output of the aligners must be sorted by read name in order to use Allo. If using Bowtie1, you may want to use samtools view to get rid of unproperly mapped pairs. It is possible to use Allo with discordant or mixed pairs but Allo will treat them equally to proper pairs. Proceed accordingly. 
+Finally, the output of the aligners must be sorted by read name in order to use Allo. If using Bowtie1 in paired-end mode, you may want to use samtools to filter unproperly mapped pairs. It is possible to use Allo with discordant or mixed pairs but Allo will treat them equally to proper pairs. Proceed accordingly. 
 ```
 samtools collate -o ALIGNEROUTPUT_SORT.SAM ALIGNEROUTPUT_FILTER.SAM
 ```
@@ -46,8 +46,10 @@ python PATH/Allo/Allo.py ALIGNEROUTPUT_SORT.SAM -seq PAIRED_OR_SINGLE -o OUTPUTN
 ```
 See other options below.
 
-## Post-processing
-Allo adds a ZA optional tag to every read that is allocated. The number within the tag corresponds to the number of places a read/pair mapped to. In order to get only uniquely mapped reads grep could be used with the -v option. On the same note, awk can used to filter reads with a specific number of mapping locations (can also be done with the -max option within Allo).
+## Post-processing and tips
+Allo adds a ZA optional tag to every read that is allocated. The value within the tag corresponds to the number of places a read/pair mapped to. In order to get only uniquely mapped reads, grep could be used with the -v option. On the same note, awk can used to filter reads with a specific number of mapping locations (can also be done with the -max option within Allo). Outside of adding this optional tag, Allo does not change anything within the read alignment columns for allocated reads.
+
+Tip: It is recommended to run Allo on both the control and target sequencing files in order to balance out background in the samples. This generally results in higher confidence peaks.
 
 
 ## Options

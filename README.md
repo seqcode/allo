@@ -44,7 +44,9 @@ The basic command for Allo:
 ```
 python PATH/Allo/Allo.py ALIGNEROUTPUT_SORT.SAM -seq PAIRED_OR_SINGLE -o OUTPUTNAME -m MIXED_OR_NARROW_PEAKS
 ```
-See other options below.
+See other options below..
+
+During each run, Allo will create temporary files as it allocates the data. UM files are reads designated as uniquely mapped (has to be parsed in Bowtie2 or BWA). MM files are unallocated multi-mapped reads. AL files are allocated reads. Checking the size of the AL files during the run will give you an estimate of how many reads have already been allocated at that time.
 
 ## Post-processing and tips
 Allo adds a ZA optional tag to every read that is allocated. The value within the tag corresponds to the number of places a read/pair mapped to. In order to get only uniquely mapped reads, grep could be used with the -v option. On the same note, awk can used to filter reads with a specific number of mapping locations (can also be done with the -max option within Allo). Outside of adding this optional tag, Allo does not change anything within the read alignment columns for allocated reads.

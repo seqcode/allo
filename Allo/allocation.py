@@ -1,26 +1,26 @@
 #Lexi Morrissey, Mahony Lab @ Pennsylvania State University
-#Last updated 09.05.2022
+#Last updated 03.01.2023
 #Contains methods for read allocation procedure of Allo.
 
 import predictPeak
 import math
 import random
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras.models import load_model, Model
 import pickle
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import time 
 import numpy as np
 import sys
-
 
     
 #Used to get counts in regions around multimapped reads
 def getArray(read, winSize, genLand):
     array = []
-    for k in range (int(read[3])-math.floor(winSize/2),int(read[3])+math.floor(winSize/2)):
+    pos = round(int(read[3])/100)*100
+    for k in range (pos-math.floor(winSize/2),int(pos)+math.floor(winSize/2)):
         key = read[2] + ";" + str(k)
         #Seeing if current pos in genetic landscape
         if key in genLand:
@@ -31,16 +31,18 @@ def getArray(read, winSize, genLand):
 
 
 #Assign reads (straight to dictionary for uniq and actual assign for multi-mapped)
-def readAssign(rBlock, samOut, seed, winSize, genLand, model, cnn_scores, noread_score, rc, rmz):
-    random.seed(seed)      #To make results reproducible
+def readAssign(rBlock, samOut, winSize, genLand, model, cnn_scores, rc, rmz, modelName, parse):
+    random.seed(7)      #To make results reproducible
     
     ##Uniquely mapped reads##
     if len(rBlock) == 1:
         #Adding to file
         samOut.write('\t'.join(rBlock[0]))
+        if parse == 1:
+            return genLand
         #Adding to genetic landscape
         key = rBlock[0][2] + ";" + str(int(rBlock[0][3]))
-        if key in genLand:
+        if key in genLand and not parse == 1:
             genLand[key] = genLand[key] + 1
         else:
             genLand[key] = 1
@@ -48,74 +50,82 @@ def readAssign(rBlock, samOut, seed, winSize, genLand, model, cnn_scores, noread
 
     ##Multi-mapped reads##
     ###CNN###
-    scores = []
-    basescores = []
+    scores_rc = []
+    scores_nn = []
+    allZ = True #seeing if all zero regions
     for i in rBlock:
-        #Find closest 500 window, use that score instead if it's already been assigned, saves time
-        pos = i[2]+str(round(int(i[3])/500)*500)
+        #Find closest 100 window, use that score instead if it's already been assigned, saves time
+        pos = i[2]+str(round(int(i[3])/100)*100)
         if pos in cnn_scores:
-            scores.append(cnn_scores[pos])
+            scores_nn.append(cnn_scores[pos])
+            allZ = False
         else:
             countArray = getArray(i, winSize, genLand)
             s = sum(countArray)
-            basescores.append(0)
+            if s > 0:
+                allZ = False
             #Allocation options
             if rc == 1:
                 if s == 0:
-                    scores.append(1)
+                    scores_rc.append(1)
                 else:
-                    scores.append(s)
+                    scores_rc.append(s+1)
                 continue
             if rc == 2:
-                scores.append(1)
+                scores_rc.append(1)
                 continue
             #Use no read score if zero region
             if s == 0:
-                scores.append(noread_score)
-                cnn_scores[pos] = noread_score
-            elif s <= 10:
-                scores.append((noread_score+s)/2)
-                cnn_scores[pos] = (noread_score+s)/2
+                scores_nn.append(0.0012*(s+1))
+            elif s <= 5:
+                scores_nn.append(0.0062*(s+1))
             else:
-                s = (predictPeak.predictNN(countArray, winSize, model)+s)/2
-                scores.append(s)
-                cnn_scores[pos] = s
+                nn = predictPeak.predictNN(countArray, winSize, model)
+                scores_nn.append(nn*(s+1))
+                cnn_scores[pos] = (nn*(s+1))
     
     #Removing reads that mapped to all zero regions
-    if sum(basescores) == 0 and rmz == 1:
+    if allZ and rmz == 1:
         return genLand
         
     ##Choosing which read to keep based on probabilities from nearby read counts
-    #Getting minimum value in list
-    minval = np.amin([scores[i] for i in list(np.nonzero(scores)[0])])
-    #Dividing all by minimum value so that nothing is less than 1
-    counts = list(np.ceil(np.true_divide(scores,minval)).astype(int))
+    #List clean up
+    if len(scores_nn)>0:
+        try:
+            percs = scores_nn / np.sum(scores_nn)
+        except:
+            print("Issue with array")
+            print(scores_nn)
+            print(scores_rc, flush=True)
+            sys.exit(0)
+    else:
+        percs = scores_rc / np.sum(scores_rc)
+
+    #Picking read to allocate based on percentages
+    np.random.seed(7)
+    choice = np.random.choice(range(0,len(rBlock)), p=percs, replace=True, size=1)[0]
     
-    #Procedure to allocate reads
-    x = 0
-    randN = random.randint(0,sum(counts))       #Used to randomly allocate reads
-    for i in range(0, len(counts)):
-        if randN in range(x,x+counts[i]):
-            #Adding to file
-            rBlock[i][-1] = rBlock[i][-1].strip()
-            rBlock[i].append("ZA:Z:" + str(len(rBlock)) + "\n")
-            samOut.write('\t'.join(rBlock[i]))
-            '''
-            key = rBlock[i][2] + ";" + str(int(rBlock[i][3]))
-            if key in genLand:
-              genLand[key] = genLand[key] + 1
-            else:
-              genLand[key] = 1
-            ''' 
-            return genLand
-        x = x + counts[i]
+    #Adding to file
+    rBlock[choice][-1] = rBlock[choice][-1].strip()
+    if not allZ:
+        rBlock[choice].append("ZA:Z:" + str(len(rBlock)) + "\n")
+    else:
+        rBlock[choice].append("ZZ:Z:" + str(len(rBlock)) + "\n")
+    samOut.write('\t'.join(rBlock[choice]))
+    '''
+    key = rBlock[choice][2] + ";" + str(int(rBlock[choice][3]))
+    if key in genLand:
+      genLand[key] = genLand[key] + 1
+    else:
+      genLand[key] = 1
+    '''
     return genLand
 
 
 #Getting uniquely mapped reads into temp files and putting them in the dictionary
-def parseUniq(tempFile, seed, winSize, cnn_scores, AS, rc, keep):
+def parseUniq(tempFile, winSize, cnn_scores, AS, rc, keep, parse):
+    modelName = None
     model = None
-    noread_score = None
     rmz = None
     genLandCur = {}
     rBlock = []
@@ -177,7 +187,7 @@ def parseUniq(tempFile, seed, winSize, cnn_scores, AS, rc, keep):
                     numR = numR + 1
                     #Put uniquely mapped reads into a file
                     if len(rBlock) == 1:
-                        genLandCur = readAssign(rBlock, UM, seed, winSize, genLandCur, model, cnn_scores, noread_score, rc, rmz)
+                        genLandCur = readAssign(rBlock, UM, winSize, genLandCur, model, cnn_scores, rc, rmz, modelName, parse)
                     #Put multimapped reads into a file
                     if len(rBlock) > 1:
                         for i in range(0,len(rBlock)):
@@ -236,7 +246,7 @@ def parseUniq(tempFile, seed, winSize, cnn_scores, AS, rc, keep):
                     numR = numR + 1
                     #Put uniquely mapped reads into a file and into dictionary
                     if len(rBlock) == 1:
-                        genLandCur = readAssign(rBlock, UM, seed, winSize, genLandCur, model, cnn_scores, noread_score, rc, rmz)
+                        genLandCur = readAssign(rBlock, UM, winSize, genLandCur, model, cnn_scores, rc, rmz, modelName, parse)
                     #Put multimapped reads into a file only, no dictionary assign
                     if len(rBlock) > 1:
                         for i in range(0,len(rBlock)):
@@ -251,7 +261,7 @@ def parseUniq(tempFile, seed, winSize, cnn_scores, AS, rc, keep):
             B.write('\t'.join(rBlock[i]))
     if b == 1:
         if len(rBlock) == 1:
-            genLandCur = readAssign(rBlock, UM, seed, winSize, genLandCur, model, cnn_scores, noread_score, rc, rmz)
+            genLandCur = readAssign(rBlock, UM, winSize, genLandCur, model, cnn_scores, rc, rmz, modelName, parse)
     #Put multimapped reads into a file
         if len(rBlock) > 1:
             for i in range(0,len(rBlock)):
@@ -265,8 +275,8 @@ def parseUniq(tempFile, seed, winSize, cnn_scores, AS, rc, keep):
     return genLandCur
 
 
-def parseMulti(tempFile, seed, winSize, genLand, modelName, cnn_scores, rc, keep, rmz, maxa):
-
+def parseMulti(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rmz, maxa):
+    parse = 0
     #Getting trained CNN
     try:
         json_file = open(modelName+'.json', 'r')
@@ -274,15 +284,13 @@ def parseMulti(tempFile, seed, winSize, genLand, modelName, cnn_scores, rc, keep
         json_file.close()
         model = tf.keras.models.model_from_json(loaded_model_json)
         model.load_weights(modelName+'.h5')
+        if "mixed" in modelName:
+            modelName = 1
+        else:
+            modelName = 0
     except:
-        print("Could not load Tensorflow model :( Allo was written with Tensorflow version 2.4.1")
+        print("Could not load Tensorflow model :( Allo was written with Tensorflow version 2.8")
         sys.exit(0)
-
-    #Used for 0 count regions, dont keep predicting on them, waste of time
-    countArray = []
-    for i in range(0,winSize):
-        countArray.append(0)
-    noread_score = predictPeak.predictNN(countArray, winSize, model)
 
     #Exception that causes errors
     if os.stat(tempFile+"MM").st_size == 0:
@@ -327,23 +335,23 @@ def parseMulti(tempFile, seed, winSize, genLand, modelName, cnn_scores, rc, keep
                         rBlock = []
                         rBlock.append(r)
                         continue
-                    genLand = readAssign(rBlock, AL, seed, winSize, genLand, model, cnn_scores, noread_score, rc, rmz)
+                    genLand = readAssign(rBlock, AL, winSize, genLand, model, cnn_scores, rc, rmz, modelName, parse)
                     #Creating a new read block for the next read
                     rBlock = [] 
                     rBlock.append(r)
 
     #For last read
     if maxa is None or len(rBlock) <= maxa:
-        genLand = readAssign(rBlock, AL, seed, winSize, genLand, model, cnn_scores, noread_score, rc, rmz)
+        genLand = readAssign(rBlock, AL, winSize, genLand, model, cnn_scores, rc, rmz, modelName, parse)
 
     os.remove(tempFile) #Removing old temp
     AL.close()
     
 
 #Getting uniquely mapped reads into temp files and putting them in the dictionary
-def parseUniqPE(tempFile, seed, winSize, cnn_scores, AS, rc, keep, r2):
+def parseUniqPE(tempFile, winSize, cnn_scores, AS, rc, keep, r2, parse):
+    modelName = None
     model = None
-    noread_score = None
     rmz = None
     if "border" in tempFile:
         b = 1
@@ -524,7 +532,7 @@ def parseUniqPE(tempFile, seed, winSize, cnn_scores, AS, rc, keep, r2):
                     UM.write('\t'.join(rBlock[-1]))
                     UM.write('\t'.join(rBlock2[-1]))
                 if len(rBlock) == 1:
-                    genLandCur = readAssignPE(rBlock, rBlock2, UM, seed, winSize, genLandCur, model, cnn_scores, noread_score, rc, rmz)
+                    genLandCur = readAssignPE(rBlock, rBlock2, UM, winSize, genLandCur, model, cnn_scores, rc, rmz, modelName, parse)
                 else:
                     for i in range(0,len(rBlock)):
                         MM.write('\t'.join(rBlock[i]))
@@ -561,7 +569,7 @@ def parseUniqPE(tempFile, seed, winSize, cnn_scores, AS, rc, keep, r2):
             B.write('\t'.join(k))
     if b == 1:
         if len(rBlock) == 1:
-            genLandCur = readAssignPE(rBlock, rBlock2, UM, seed, winSize, genLandCur, model, cnn_scores, noread_score, rc, rmz)
+            genLandCur = readAssignPE(rBlock, rBlock2, UM, winSize, genLandCur, model, cnn_scores, rc, rmz, modelName, parse)
         #Put multimapped reads into a file
         if len(rBlock) > 1:
             for i in range(0,len(rBlock)):
@@ -577,17 +585,19 @@ def parseUniqPE(tempFile, seed, winSize, cnn_scores, AS, rc, keep, r2):
 
 
 #Assign reads (straight to dictionary for uniq and actual assign for multi-mapped)
-def readAssignPE(rBlock, rBlock2, samOut, seed, winSize, genLand, model, cnn_scores, noread_score, rc, rmz):
-    random.seed(seed)      #To make results reproducible
+def readAssignPE(rBlock, rBlock2, samOut, winSize, genLand, model, cnn_scores, rc, rmz, modelName, parse):
+    random.seed(7)      #To make results reproducible
     
     ##Uniquely mapped reads##
     if len(rBlock) == 1:
         #Adding to file
         samOut.write('\t'.join(rBlock[0]))
         samOut.write('\t'.join(rBlock2[0]))
+        if parse == 1:
+            return genLand
         #Adding to genetic landscape
         key = rBlock[0][2] + ";" + str(int(rBlock[0][3]))
-        if key in genLand:
+        if key in genLand and not parse == 1:
             genLand[key] = genLand[key] + 1
         else:
             genLand[key] = 1
@@ -597,81 +607,92 @@ def readAssignPE(rBlock, rBlock2, samOut, seed, winSize, genLand, model, cnn_sco
     
     ##Multi-mapped reads##
     ###CNN###
-    scores = []
-    basescores = []
+    scores_rc = []
+    scores_nn = []
+    allZ = True #seeing if all zero regions
     for i in rBlock:
-        #Find closest 500 window, use that score instead if it's already been assigned, saves time
-        pos = i[2]+str(round(int(i[3])/500)*500)
+        #Find closest 100 window, use that score instead if it's already been assigned, saves time
+        pos = i[2]+str(round(int(i[3])/100)*100)
         if pos in cnn_scores:
-            scores.append(cnn_scores[pos])
+            scores_nn.append(cnn_scores[pos])
+            allZ = False
         else:
             countArray = getArray(i, winSize, genLand)
             s = sum(countArray)
-            basescores.append(s)
+            if s > 0:
+                allZ = False
             #Allocation options
             if rc == 1:
                 if s == 0:
-                    scores.append(1)
+                    scores_rc.append(1)
                 else:
-                    scores.append(s)
+                    scores_rc.append(s+1)
                 continue
             if rc == 2:
-                scores.append(1)
+                scores_rc.append(1)
                 continue
             #Use no read score if zero region
             if s == 0:
-                scores.append(noread_score)
-                cnn_scores[pos] = noread_score
-            elif s <= 10:
-                scores.append((noread_score+s)/2)
-                cnn_scores[pos] = (noread_score+s)/2
+                scores_nn.append(0.0012*(s+1))
+            elif s <= 5:
+                scores_nn.append(0.0062*(s+1))
             else:
-                s = (predictPeak.predictNN(countArray, winSize, model)+s)/2
-                scores.append(s)
-                cnn_scores[pos] = s
-                
+                nn = predictPeak.predictNN(countArray, winSize, model)
+                scores_nn.append(nn*(s+1))
+                cnn_scores[pos] = (nn*(s+1))
+    
     #Removing reads that mapped to all zero regions
-    if sum(basescores) == 0 and rmz == 1:
+    if allZ and rmz == 1:
         return genLand
         
     ##Choosing which read to keep based on probabilities from nearby read counts
-    #Getting minimum value in list
-    minval = np.amin([scores[i] for i in list(np.nonzero(scores)[0])])
-    #Dividing all by minimum value so that nothing is less than 1
-    counts = list(np.ceil(np.true_divide(scores,minval)).astype(int))
+    #List clean up
+    if len(scores_nn)>0:
+        try:
+            percs = scores_nn / np.sum(scores_nn)
+        except:
+            print("Issue with array")
+            print(scores_nn)
+            print(scores_rc, flush=True)
+            sys.exit(0)
+    else:
+        percs = scores_rc / np.sum(scores_rc)
+
+    #Picking read to allocate based on percentages
+    np.random.seed(7)
+    choice = np.random.choice(range(0,len(rBlock)), p=percs, replace=True, size=1)[0]
     
-    #Procedure to allocate reads
-    x = 0
-    randN = random.randint(0,sum(counts))       #Used to randomly allocate reads
-    for i in range(0, len(counts)):
-        if randN in range(x,x+counts[i]):
-            #Adding to file
-            rBlock[i][-1] = rBlock[i][-1].strip()
-            rBlock2[i][-1] = rBlock2[i][-1].strip()
-            rBlock[i].append("ZA:Z:" + str(len(rBlock)) + "\n")
-            rBlock2[i].append("ZA:Z:" + str(len(rBlock)) + "\n")
-            samOut.write('\t'.join(rBlock[i]))
-            samOut.write('\t'.join(rBlock2[i]))
-            return genLand
-        x = x + counts[i]
+    #Adding to file
+    rBlock[choice][-1] = rBlock[choice][-1].strip()
+    rBlock2[choice][-1] = rBlock2[choice][-1].strip()
+    if not allZ:
+        rBlock[choice].append("ZA:Z:" + str(len(rBlock)) + "\n")
+        rBlock2[choice].append("ZA:Z:" + str(len(rBlock)) + "\n")
+    else:
+        rBlock[choice].append("ZZ:Z:" + str(len(rBlock)) + "\n")
+        rBlock2[choice].append("ZZ:Z:" + str(len(rBlock)) + "\n")
+    samOut.write('\t'.join(rBlock[choice]))
+    samOut.write('\t'.join(rBlock2[choice]))
     return genLand
 
 
 
-def parseMultiPE(tempFile, seed, winSize, genLand, modelName, cnn_scores, rc, keep, rmz, maxa):
-
-    #Getting trained CNN
-    json_file = open(modelName+'.json', 'r')
-    loaded_model_json = json_file.read()
-    json_file.close()
-    model = tf.keras.models.model_from_json(loaded_model_json)
-    model.load_weights(modelName+'.h5')
-
-    #Used for 0 count regions, dont keep predicting on them, waste of time
-    countArray = []
-    for i in range(0,winSize):
-        countArray.append(0)
-    noread_score = predictPeak.predictNN(countArray, winSize, model)
+def parseMultiPE(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rmz, maxa):
+    parse = 0
+    #Getting trained CNN and making sure there is a compatible tensorflow installed
+    try:
+        json_file = open(modelName+'.json', 'r')
+        loaded_model_json = json_file.read()
+        json_file.close()
+        model = tf.keras.models.model_from_json(loaded_model_json)
+        model.load_weights(modelName+'.h5')
+        if "mixed" in modelName:
+            modelName = 1
+        else:
+            modelName = 0
+    except:
+        print("Could not load Tensorflow model :( Allo was written with Tensorflow version 2.8")
+        sys.exit(0)
 
     #Exception that causes errors
     if os.stat(tempFile+"MM").st_size == 0:
@@ -734,7 +755,7 @@ def parseMultiPE(tempFile, seed, winSize, genLand, modelName, cnn_scores, rc, ke
             else:
                 if maxa is not None and len(rBlock) > maxa:
                     continue
-                genLand = readAssignPE(rBlock, rBlock2, AL, seed, winSize, genLand, model, cnn_scores, noread_score, rc, rmz)
+                genLand = readAssignPE(rBlock, rBlock2, AL, winSize, genLand, model, cnn_scores, rc, rmz, modelName, parse)
                 rBlock = []
                 rBlock2 = []
                 rBlock.append(r)
@@ -744,7 +765,7 @@ def parseMultiPE(tempFile, seed, winSize, genLand, modelName, cnn_scores, rc, ke
 
     #For last read
     if maxa is None or len(rBlock) <= maxa:
-        genLand = readAssignPE(rBlock, rBlock2, AL, seed, winSize, genLand, model, cnn_scores, noread_score, rc, rmz)
+        genLand = readAssignPE(rBlock, rBlock2, AL, winSize, genLand, model, cnn_scores, rc, rmz, modelName, parse)
 
     os.remove(tempFile) #Removing old temp
     AL.close()

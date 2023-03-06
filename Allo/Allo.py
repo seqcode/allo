@@ -1,31 +1,31 @@
 #Lexi Morrissey, Mahony Lab @ Pennsylvania State University
-#Last updated 9.06.2022
+#Last updated 03.06.2023
 #Main method for Allo. Splits the sam files up and sends them to allocation procedure via multiprocessing package.
 
-import sys
-
-#Help message
-if "-h" in sys.argv or len(sys.argv)<3:
-    print("\nusage: Allo [-h]")
-    print("Developed by Alexis Morrissey, Mahony Laboratory @ The Pennsylvania State University")
-    print("Allo is a python program used allocate multi-mapped reads in ChIP-seq data.")
-    print("For more pre-processing info and basic usage, please visit https://github.com/seqcode/allo" + "\n\n")
-    print("##REQUIRED ARGUMENTS##")
-    print("-seq      {se/pe}      Single-end or paired-end sequencing mode" + "\n\n")
-    print("##OPTIONAL ARGUMENTS##")
-    print("-o      {string}      Output file name")
-    print("-m      {mixed/narrow}      Use CNN trained on either a narrow peak dataset or a dataset with mixed peaks, narrow by default")
-    print("-t      {int}      Number of threads, 1 by default")
-    print("-max      {int}      Maximum value for number of locations a read can map to")
-    print("--keep-unmap      Keep unmapped reads and reads that include N in their sequence")
-    print("--remove-zeros      Disregard multi-mapped reads that map to regions with 0 uniquely mapped reads (random assignment)")
-    print("--r2      Use read 2 for allocation procedure instead of read 1 (only for paired-end sequencing)")
-    print("--readcount      CNN will not be used in allocation, only read counts")
-    print("--random      Reads will be randomly assigned (similar to Bowtie and BWA on default)")
-    print("\n")
-    sys.exit(0)
+#Arguments
+import argparse
+parser = argparse.ArgumentParser(prog = 'Allo', \
+                    description = 'Allo is a software that allocates multi-mapped reads in ChIP-seq data\n' \
+                    'Developed by Alexis Morrissey, Mahony Laboratory @ The Pennsylvania State University', \
+                    epilog= 'For more pre-processing info and basic usage, please visit https://github.com/seqcode/allo')
+parser.add_argument('input')
+parser.add_argument('-seq', type=str, nargs=1, help='Single-end or paired-end sequencing mode', \
+                   choices=['pe','se'], required=True, dest='seq')
+parser.add_argument('-o', type=str, nargs=1, help='Output file name', dest='outfile', default=None)
+parser.add_argument('--mixed', help='Use CNN trained on a dataset with mixed peaks, narrow by default', action='store_true', default=None)
+parser.add_argument('-t', type=int, nargs=1, help='Number of threads, 1 by default', dest='threads', default=None)
+parser.add_argument('-max', type=int, nargs=1, help='Maximum value for number of locations a read can map', dest='maxlocations', default=None)
+parser.add_argument('--keep-unmap', help='Keep unmapped reads and reads that include N in their sequence', action='store_true', default=None)
+parser.add_argument('--remove-zeros', help='Disregard multi-mapped reads that map to regions with 0 uniquely mapped reads (random assignment)', action='store_true', default=None)
+parser.add_argument('--r2', help='Use read 2 for allocation procedure instead of read 1 (only for paired-end sequencing)', action='store_true', default=None)
+parser.add_argument('--readcount', help='CNN will not be used in allocation, only read counts', action='store_true', default=None)
+parser.add_argument('--random', help='Reads will be randomly assigned (similar to Bowtie and BWA on default)', action='store_true', default=None)
+parser.add_argument('--ignore', help='Ignore warnings about read sorting', action='store_true', default=None)
+parser.add_argument('--parser', help='Ignore warnings about read sorting', action='store_true', default=None)
+args = parser.parse_args()
 
 #Imports
+import sys
 from joblib import Parallel, delayed
 import multiprocessing
 import subprocess
@@ -35,6 +35,8 @@ import math
 from random import randint
 import shutil
 import glob
+import pysam
+import shutil
 
 #Function for concatenating files
 def cat(files, outname):
@@ -45,95 +47,93 @@ def cat(files, outname):
 
 ##Main Method##          
 if __name__ == '__main__':
-
-    pos_args = ['-o','--mixed','-s','-t','-seq','--readcount','--random','--keep-unmap','--remove-zeros','-max','--r2','--ignore']
-    for arg in sys.argv[2:]:
-        if arg[0] == "-" and arg not in pos_args:
-            print("Argument not recognized: " + arg)
-            sys.exit(0)
     
-    #Input name
+    
+    #Make a folder to store all temp files in allo
+    ids = str(randint(0, 10000))
+    curr_dir = os.getcwd()
+    allo_dir = os.path.join(curr_dir, r'allo.'+ids)
+    if not os.path.exists(allo_dir):
+        os.makedirs(allo_dir)
+    
+    #Input name and bam conversion if necessary
     try:
-        samfile = sys.argv[1]
+        samfile = args.input
     except:
-        print("SAM file not given")
+        print("SAM/BAM file not given or PySam does not recognize format of file.")
+    #Convert from bam to sam if necessary
+    if not ".sam" in samfile and not ".SAM" in samfile:
+        pysam.set_verbosity(0) #Pysam outputs a warning about indexing
+        infile = pysam.AlignmentFile(samfile, "rb")
+        outfile = pysam.AlignmentFile(allo_dir+"/"+ids+".sam", "w", template=infile)
+        for rec in infile:
+            outfile.write(rec)
+        samfile = allo_dir+"/"+ids+".sam"
     #Output name
-    if "-o" in sys.argv:
-        outfile = sys.argv[sys.argv.index("-o")+1]
+    if args.outfile is not None:
+        outfile = args.outfile[0]
     else:
-        outfile = samfile[:-4] + ".allo.sam"
+        outfile = args.input[:-4] + ".allo.sam"
     #Model and window size
-    if "--mixed" in sys.argv:
+    if args.mixed is not None:
         m = os.path.dirname(sys.argv[0])+"/mixed"
         winSize = 500
     else:
         m = os.path.dirname(sys.argv[0])+"/narrow"
         winSize = 500
-    #Seed
-    if "-s" in sys.argv:
-        seed = int(sys.argv[sys.argv.index("-s")+1])
-    else:
-        seed = 7
     #Number of threads
-    if "-t" in sys.argv:
-        thr = int(sys.argv[sys.argv.index("-t")+1])
+    if args.threads is not None:
+        thr = args.threads[0]
     else:
-        thr = 1  
+        thr = 1
     #Single or paired end
-    if "-seq" in sys.argv:
-        if sys.argv[sys.argv.index("-seq")+1] == "se":
-            seq = 1
-        elif sys.argv[sys.argv.index("-seq")+1] == "pe":
-            seq = 0
-        else:
-            print("ERROR: Sequencing type not recognized. Please specify single-end (se) or paired-end (pe).")
-            sys.exit(0)
-    else:
-        print("ERROR: Sequencing type invalid or not specified.")
+    if args.seq[0] == "se":
+        seq = 1
+    elif args.seq[0] == "pe":
+        seq = 0
     #Options for probabilities
-    if "--readcount" in sys.argv:
+    if args.readcount is not None:
         rc = 1
-    elif "--random" in sys.argv:
+    elif args.random is not None:
         rc = 2
     else:
         rc = 0
     #Keep unmapped reads
-    if "--keep-unmap" in sys.argv:
+    if args.keep_unmap is not None:
         keep = 1
     else:
         keep = 0
     #Remove reads that only map to zero regions
-    if "--remove-zeros" in sys.argv:
+    if args.remove_zeros is not None:
         rmz = 1
     else:
         rmz = 0
     #User defined max number of alignments
-    if "-max" in sys.argv:
-        maxa = int(sys.argv[sys.argv.index("-max")+1])
+    if args.maxlocations is not None:
+        maxa = args.maxlocations[0]
     else:
-        maxa = None 
+        maxa = None
     #Use read 2 instead of read 1 for allocation
-    if "--r2" in sys.argv:
+    if args.r2 is not None:
         r2 = 1
     else:
         r2 = 0
     #Ignore allo warnings
-    if "--ignore" in sys.argv:
+    if args.ignore is not None:
         ig = 1
     else:
         ig = 0
+    #Use allo's parser function only
+    if args.parser is not None:
+        parse = 1
+    else:
+        parse = 0
     
-
-    #Need list of file names
-    ids = str(randint(0, 10000))
-    tempList = []
-    for i in range (0,thr):
-        tempList.append("allo.temp." + ids + "." + str(i).zfill(2))
-        
+    
     #Getting header information and checking to see if file was sorted
     collate = 0
     f = open(samfile)
-    header = open('header'+ids, 'a')
+    header = open(allo_dir+'/header', 'a')
     for line in f:
         if line.startswith('@'):
             header.write(line)
@@ -144,12 +144,18 @@ if __name__ == '__main__':
     f.close()
     header.close()
     if collate == 0 and ig == 0:
-        print("Warning: PG tag not present in header. File does not appear to be sorted.")
+        print("Warning: PG tag with collate not present in header. File does not appear to be sorted.")
         print("Please use Samtools collate before running Allo. To ignore this warning use argument --ignore")
         sys.exit(0)
     elif collate == 0 and ig == 1:
         print("Suppressed warning: PG tag not present in header. File does not appear to be sorted.")
+
     
+    #Need list of file names
+    tempList = []
+    for i in range (0,thr):
+        tempList.append(allo_dir+"/allo.temp." + ids + "." + str(i).zfill(2))
+        
     #Get number of lines
     count = 0
     file = open(samfile, 'rb')
@@ -195,7 +201,7 @@ if __name__ == '__main__':
     if seq == 1:
         #PHASE I: Parsing unique reads and putting into dictionary
         cnn_scores = {} #Used to keep some previous scores for places in the genome by the cnn to save time
-        output = Parallel(n_jobs=thr)(delayed(allocation.parseUniq)(i, seed, winSize, cnn_scores, AS, rc, keep) for i in tempList)
+        output = Parallel(n_jobs=thr)(delayed(allocation.parseUniq)(i, winSize, cnn_scores, AS, rc, keep, parse) for i in tempList)
         #Updating genetic landscape with uniquely mapped reads
         genLand = {}
         for d in output:
@@ -210,7 +216,7 @@ if __name__ == '__main__':
         else:
             os.rename(tempList[0] + 'B', tempList[0]+".borders")
             
-        borderDict = allocation.parseUniq(tempList[0]+".borders", seed, winSize, cnn_scores, AS, rc, keep)
+        borderDict = allocation.parseUniq(tempList[0]+".borders", winSize, cnn_scores, AS, rc, keep, parse)
         d.update(borderDict)
         #Cat with first MM file 
         cat([tempList[0]+'MM', tempList[0]+'.bordersMM'], tempList[0]+'.catborders')
@@ -224,26 +230,36 @@ if __name__ == '__main__':
         for filename in glob.glob('./*borders*'):
             os.remove(filename) 
         
+        #Stopping if parsing only
+        if parse == 1:
+            l = [allo_dir+"/header"]
+            for i in tempList:
+                if os.path.exists(str(i)+"UM"):
+                    l.append(i + "UM")
+            cat(l, args.input[:-4]+".allo.UMR_only.sam")
+            l = [allo_dir+"/header"]
+            for i in tempList:
+                if os.path.exists(str(i)+"MM"):
+                    l.append(i + "MM")
+            cat(l, args.input[:-4]+".allo.MMR_only.sam")
+            shutil.rmtree(allo_dir)
+            sys.exit(0)
         
         #PHASE II: Parsing multi-mapped reads
         output = []
-        output = Parallel(n_jobs=thr)(delayed(allocation.parseMulti)(i, seed, winSize, genLand, m, cnn_scores, rc, keep, rmz, maxa) for i in tempList)
+        output = Parallel(n_jobs=thr)(delayed(allocation.parseMulti)(i, winSize, genLand, m, cnn_scores, rc, keep, rmz, maxa) for i in tempList)
         
         
         #Final parsing and file clean up
         #Deleting temporary files and join allocated files
-        l = ["header"+ids]
+        l = [allo_dir+"/header"]
         for i in tempList:
             if os.path.exists(str(i)+"AL"):
                 l.append(i + "AL")
             l.append(i + "UM")
         cat(l, outfile)
         
-        #Remove all temporary files
-        for filename in glob.glob('allo.temp.*'):
-            os.remove(filename)
-        
-        os.remove("header"+ids)
+        shutil.rmtree(allo_dir)
 
         
     
@@ -252,7 +268,7 @@ if __name__ == '__main__':
     
         #PHASE I: Parsing unique reads and putting into dictionary
         cnn_scores = {} #Used to keep some previous scores for places in the genome by the cnn to save time
-        output = Parallel(n_jobs=thr)(delayed(allocation.parseUniqPE)(i, seed, winSize, cnn_scores, AS, rc, keep, r2) for i in tempList)
+        output = Parallel(n_jobs=thr)(delayed(allocation.parseUniqPE)(i, winSize, cnn_scores, AS, rc, keep, r2, parse) for i in tempList)
         #Updating genetic landscape with uniquely mapped reads
         genLand = {}
         for d in output:
@@ -266,7 +282,7 @@ if __name__ == '__main__':
             cat(l, tempList[0]+".borders")
         else:
             os.rename(tempList[0]+'B', tempList[0]+".borders")   
-        borderDict = allocation.parseUniqPE(tempList[0]+".borders", seed, winSize, cnn_scores, AS, rc, keep, r2)
+        borderDict = allocation.parseUniqPE(tempList[0]+".borders", winSize, cnn_scores, AS, rc, keep, r2, parse)
         d.update(borderDict)
         #Cat with first MM file 
         cat([tempList[0]+'MM', tempList[0]+'.bordersMM'], tempList[0]+'.catborders')
@@ -276,24 +292,34 @@ if __name__ == '__main__':
         cat([tempList[0]+'UM', tempList[0]+'.bordersUM'], tempList[0]+'.catborders')
         #Fix name
         os.rename(tempList[0]+".catborders", tempList[0]+"UM")
-       
+        
+        #Stopping if parsing only
+        if parse == 1:
+            l = [allo_dir+"/header"]
+            for i in tempList:
+                if os.path.exists(str(i)+"UM"):
+                    l.append(i + "UM")
+            cat(l, args.input[:-4]+".allo.UMR_only.sam")
+            l = [allo_dir+"/header"]
+            for i in tempList:
+                if os.path.exists(str(i)+"MM"):
+                    l.append(i + "MM")
+            cat(l, args.input[:-4]+".allo.MMR_only.sam")
+            shutil.rmtree(allo_dir)
+            sys.exit(0)
         
         #PHASE II: Parsing multi-mapped reads
         output = []
-        output = Parallel(n_jobs=thr)(delayed(allocation.parseMultiPE)(i, seed, winSize, genLand, m, cnn_scores, rc, keep, rmz, maxa) for i in tempList)
+        output = Parallel(n_jobs=thr)(delayed(allocation.parseMultiPE)(i, winSize, genLand, m, cnn_scores, rc, keep, rmz, maxa) for i in tempList)
         
         
         #Final parsing and file clean up
         #Deleting temporary files and join allocated files
-        l = ["header" + ids]
+        l = [allo_dir+"/header"]
         for i in tempList:
             if os.path.exists(str(i)+"AL"):
                 l.append(i + "AL")
             l.append(i + "UM")
         cat(l, outfile)
         
-        for filename in glob.glob('allo.temp.*'):
-            os.remove(filename)
-        
-        #Remove all temporary files
-        os.remove('header'+ids)
+        shutil.rmtree(allo_dir)

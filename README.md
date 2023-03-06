@@ -2,11 +2,13 @@
 ## Required imports
 Allo was written with the following imported packages. All other packages used are built into Python. Especially concerning Tensorflow, it is recommended to create a conda environment specific to this version as Allo may not function without it:
 
-joblib	1.2.1
+joblib	1.1.0
 
-numpy		1.23.3
+numpy		1.23.1
 
-tensorflow	2.8.1
+tensorflow	2.11
+
+pysam 0.20.0
 
 ## Pre-processing
 Using Allo requires a few pre-processing steps. In most ChIP pipelines, the default behavior of aligners is to assign multi-mapped reads to random locations within their mappings without retaining information on the other locations. Both Bowtie1/2 and BWA can be used for single-end. Unfortunately, BWA cannot be used for paired-end reads prior to Allo due to constraints in how it outputs multi-mapped reads. The following arguments should be used:
@@ -69,6 +71,7 @@ Tip: It is recommended to run Allo on both the control and target sequencing fil
 | --random |  | Reads will be randomly assigned (similar to Bowtie and BWA by default) |
 | -s  | any int | Seed for random number generator to keep consistency, 7 by default |
 | --ignore |  | Ignore warning about read sorting |
+| --parser |  | Allo utility that produces separate files for unique and multi-mapped reads from a SAM or BAM file. Bowtie2 and BWA will output all alignments that meet the given threshold even if one alignment has the highest score. |
 
 
 ## Test files

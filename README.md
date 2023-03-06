@@ -46,7 +46,7 @@ The basic command for Allo:
 ```
 python PATH/Allo/Allo.py ALIGNEROUTPUT_SORT.SAM -seq PAIRED_OR_SINGLE -o OUTPUTNAME -m MIXED_OR_NARROW_PEAKS
 ```
-See other options below..
+Allo also accepts BAM files as input. See other options below..
 
 During each run, Allo will create temporary files as it allocates the data. UM files are reads designated as uniquely mapped (has to be parsed in Bowtie2 or BWA). MM files are unallocated multi-mapped reads. AL files are allocated reads. Checking the size of the AL files during the run will give you an estimate of how many reads have already been allocated at that time.
 

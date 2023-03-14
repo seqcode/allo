@@ -64,7 +64,7 @@ Tip: It is recommended to run Allo on both the control and target sequencing fil
 | -m  | "mixed" "narrow" | Use CNN trained on either a narrow peak dataset or a dataset with mixed peaks, narrow by default |
 | -t  | any int | Number of threads, 1 by default |
 | --keep-unmap |  | Keep unmapped reads and reads that include N in their sequence | 
-| --remove-zeros |  | Disregard multi-mapped reads that map to regions with 0 uniquely mapped reads (random assignment) |
+| --remove-zeros |  | Do not report multi-mapped reads that map to regions with 0 uniquely mapped reads (random assignment) |
 | -max | any int | Maximum value for number of locations a read can map to |
 | --r2 |  | Use read 2 for allocation procedure instead of read 1 (only for paired-end sequencing) |
 | --readcount |  | CNN will not be used in allocation, only read counts |

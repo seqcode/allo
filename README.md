@@ -51,9 +51,9 @@ Allo also accepts BAM files as input. See other options below..
 During each run, Allo will create temporary files as it allocates the data. UM files are reads designated as uniquely mapped (has to be parsed in Bowtie2 or BWA). MM files are unallocated multi-mapped reads. AL files are allocated reads. Checking the size of the AL files during the run will give you an estimate of how many reads have already been allocated at that time.
 
 ## Post-processing and tips
-Allo adds a ZA optional tag to every read that is allocated. The value within the tag corresponds to the number of places a read/pair mapped to. In order to get only uniquely mapped reads, grep could be used with the -v option. On the same note, awk can used to filter reads with a specific number of mapping locations (can also be done with the -max option within Allo). Outside of adding this optional tag, Allo does not change anything within the read alignment columns for allocated reads.
+Allo adds a ZA tag to every MMR that is allocated. For reads that are allocated to regions that all contain 0 UMRs (random assignment), a ZZ tag is used instead. This allows users to remove reads that only map to zero UMR regions if they wish. The value within either tag corresponds to the number of places a read/pair mapped to. In order to get only uniquely mapped reads, grep could be used with the -v option to exclude lines with ZA or ZZ tags. On the same note, awk can used to filter reads with a specific number of mapping locations (can also be done with the -max option within Allo). Outside of adding these tags, Allo does not change anything within the read alignment columns for allocated reads.
 
-Tip: It is recommended to run Allo on both the control and target sequencing files in order to balance out background in the samples. This generally results in higher confidence peaks.
+Tip: It is recommended to run Allo on both the control and target sequencing files in order to balance out background in the samples. We recommend running Allo using the --random argument on the control file. This generally results in higher confidence peaks.
 
 
 ## Options
@@ -64,7 +64,7 @@ Tip: It is recommended to run Allo on both the control and target sequencing fil
 | -m  | "mixed" "narrow" | Use CNN trained on either a narrow peak dataset or a dataset with mixed peaks, narrow by default |
 | -t  | any int | Number of threads, 1 by default |
 | --keep-unmap |  | Keep unmapped reads and reads that include N in their sequence | 
-| --remove-zeros |  | Disregard multi-mapped reads that map to regions with 0 uniquely mapped reads (random assignment) |
+| --remove-zeros |  | Do not report multi-mapped reads that map to regions with 0 uniquely mapped reads (random assignment) |
 | -max | any int | Maximum value for number of locations a read can map to |
 | --r2 |  | Use read 2 for allocation procedure instead of read 1 (only for paired-end sequencing) |
 | --readcount |  | CNN will not be used in allocation, only read counts |

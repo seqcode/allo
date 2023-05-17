@@ -2,6 +2,7 @@
 #Last updated 03.01.2023
 #Contains methods for read allocation procedure of Allo.
 
+from memory_profiler import profile
 import predictPeak
 import math
 import random
@@ -14,8 +15,28 @@ import pickle
 import time 
 import numpy as np
 import sys
+import multiprocessing
 
-    
+
+#Add reads to UMR dictionary
+def addToDict(tempFile, genLand, seq):
+    count = 0
+    with open(tempFile) as f:
+        for line in f:
+            l = line.strip().split('\t')
+            if l[2] == "*":
+                continue
+            elif "N" in l[9]:
+                continue
+            count = count + 1
+            if seq == 0 and not (count % 2) == 0:
+                continue
+            key = l[2] + ";" + str(l[3])
+            if key in genLand:
+                genLand[key] = genLand[key] + 1
+            else:
+                genLand[key] = 1
+
 #Used to get counts in regions around multimapped reads
 def getArray(read, winSize, genLand):
     array = []
@@ -31,22 +52,8 @@ def getArray(read, winSize, genLand):
 
 
 #Assign reads (straight to dictionary for uniq and actual assign for multi-mapped)
-def readAssign(rBlock, samOut, winSize, genLand, model, cnn_scores, rc, rmz, modelName, parse):
+def readAssign(rBlock, samOut, winSize, genLand, model, cnn_scores, rc, rmz, modelName):
     random.seed(7)      #To make results reproducible
-    
-    ##Uniquely mapped reads##
-    if len(rBlock) == 1:
-        #Adding to file
-        samOut.write('\t'.join(rBlock[0]))
-        if parse == 1:
-            return genLand
-        #Adding to genetic landscape
-        key = rBlock[0][2] + ";" + str(int(rBlock[0][3]))
-        if key in genLand and not parse == 1:
-            genLand[key] = genLand[key] + 1
-        else:
-            genLand[key] = 1
-        return genLand
 
     ##Multi-mapped reads##
     ###CNN###
@@ -86,7 +93,7 @@ def readAssign(rBlock, samOut, winSize, genLand, model, cnn_scores, rc, rmz, mod
     
     #Removing reads that mapped to all zero regions
     if allZ and rmz == 1:
-        return genLand
+        return
         
     ##Choosing which read to keep based on probabilities from nearby read counts
     #List clean up
@@ -112,22 +119,18 @@ def readAssign(rBlock, samOut, winSize, genLand, model, cnn_scores, rc, rmz, mod
     else:
         rBlock[choice].append("ZZ:Z:" + str(len(rBlock)) + "\n")
     samOut.write('\t'.join(rBlock[choice]))
-    '''
-    key = rBlock[choice][2] + ";" + str(int(rBlock[choice][3]))
-    if key in genLand:
-      genLand[key] = genLand[key] + 1
-    else:
-      genLand[key] = 1
-    '''
-    return genLand
+    return
 
 
 #Getting uniquely mapped reads into temp files and putting them in the dictionary
-def parseUniq(tempFile, winSize, cnn_scores, AS, rc, keep, parse):
+def parseUniq(tempFile, winSize, cnn_scores, AS, rc, keep):
+    #Variables for stats
+    cu = 0  #UMRs
+    cf = 0  #Filtered
+    
     modelName = None
     model = None
     rmz = None
-    genLandCur = {}
     rBlock = []
     if "border" in tempFile:
         b = 1
@@ -156,8 +159,10 @@ def parseUniq(tempFile, winSize, cnn_scores, AS, rc, keep, parse):
             #Keep unmapped reads if user chooses
             if keep == 0:
                 if r[2] == "*":
+                    cf += 1
                     continue
                 if "N" in r[9]:
+                    cf += 1
                     continue
               
 
@@ -187,11 +192,13 @@ def parseUniq(tempFile, winSize, cnn_scores, AS, rc, keep, parse):
                     numR = numR + 1
                     #Put uniquely mapped reads into a file
                     if len(rBlock) == 1:
-                        genLandCur = readAssign(rBlock, UM, winSize, genLandCur, model, cnn_scores, rc, rmz, modelName, parse)
+                        UM.write('\t'.join(rBlock[0]))
+                        cu += 1
                     #Put multimapped reads into a file
                     if len(rBlock) > 1:
                         for i in range(0,len(rBlock)):
                             MM.write('\t'.join(rBlock[i]))
+                            
                     #Creating a new read block for the next read
                     rBlock = []
                     rBlock.append(r)
@@ -246,11 +253,13 @@ def parseUniq(tempFile, winSize, cnn_scores, AS, rc, keep, parse):
                     numR = numR + 1
                     #Put uniquely mapped reads into a file and into dictionary
                     if len(rBlock) == 1:
-                        genLandCur = readAssign(rBlock, UM, winSize, genLandCur, model, cnn_scores, rc, rmz, modelName, parse)
+                        UM.write('\t'.join(rBlock[0]))
+                        cu += 1
                     #Put multimapped reads into a file only, no dictionary assign
                     if len(rBlock) > 1:
                         for i in range(0,len(rBlock)):
                             MM.write('\t'.join(rBlock[i]))
+                            
                     #Creating a new read block for the next read
                     rBlock = []
                     rBlock.append(r)
@@ -261,22 +270,24 @@ def parseUniq(tempFile, winSize, cnn_scores, AS, rc, keep, parse):
             B.write('\t'.join(rBlock[i]))
     if b == 1:
         if len(rBlock) == 1:
-            genLandCur = readAssign(rBlock, UM, winSize, genLandCur, model, cnn_scores, rc, rmz, modelName, parse)
+            UM.write('\t'.join(rBlock[0]))
+            cu += 1
     #Put multimapped reads into a file
         if len(rBlock) > 1:
             for i in range(0,len(rBlock)):
                 MM.write('\t'.join(rBlock[i]))
+                
 
     UM.close()
     MM.close()
     if b == 0:
         B.close()
     os.remove(tempFile) #Removing old temp
-    return genLandCur
+    return [cu, cf]
 
 
 def parseMulti(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rmz, maxa):
-    parse = 0
+    numLoc = [0,0] #Keep info on average number of places read maps to
     #Getting trained CNN
     try:
         json_file = open(modelName+'.json', 'r')
@@ -294,7 +305,7 @@ def parseMulti(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rmz,
 
     #Exception that causes errors
     if os.stat(tempFile+"MM").st_size == 0:
-        return
+        return numLoc
     
     #File with MM allocations
     AL = open(tempFile + "AL","w+")
@@ -335,21 +346,31 @@ def parseMulti(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rmz,
                         rBlock = []
                         rBlock.append(r)
                         continue
-                    genLand = readAssign(rBlock, AL, winSize, genLand, model, cnn_scores, rc, rmz, modelName, parse)
+                    readAssign(rBlock, AL, winSize, genLand, model, cnn_scores, rc, rmz, modelName)
+                    #Getting average number of locations mapped to
+                    numLoc[0] = (numLoc[0]*numLoc[1] + len(rBlock)) / (numLoc[1]+1)
+                    numLoc[1] = numLoc[1] + 1
                     #Creating a new read block for the next read
                     rBlock = [] 
                     rBlock.append(r)
 
     #For last read
     if maxa is None or len(rBlock) <= maxa:
-        genLand = readAssign(rBlock, AL, winSize, genLand, model, cnn_scores, rc, rmz, modelName, parse)
+        readAssign(rBlock, AL, winSize, genLand, model, cnn_scores, rc, rmz, modelName)
+        numLoc[0] = (numLoc[0]*numLoc[1] + len(rBlock)) / (numLoc[1]+1)
+        numLoc[1] = numLoc[1] + 1
 
     os.remove(tempFile) #Removing old temp
     AL.close()
+    return numLoc
     
 
 #Getting uniquely mapped reads into temp files and putting them in the dictionary
-def parseUniqPE(tempFile, winSize, cnn_scores, AS, rc, keep, r2, parse):
+def parseUniqPE(tempFile, winSize, cnn_scores, AS, rc, keep, r2):
+    #Keeping information on read counts
+    cu = 0
+    cf = 0
+    
     modelName = None
     model = None
     rmz = None
@@ -357,7 +378,6 @@ def parseUniqPE(tempFile, winSize, cnn_scores, AS, rc, keep, r2, parse):
         b = 1
     else:
         b = 0
-    genLandCur = {}
     rBlock = []
     rBlock2 = []
     #File with uniquely mapped reads
@@ -458,10 +478,12 @@ def parseUniqPE(tempFile, winSize, cnn_scores, AS, rc, keep, r2, parse):
                     #Keeping unmapped reads if users choose
                     if keep == 0:
                         if rBlock2[-1][2] == "*" or "N" in rBlock2[-1][9] or rBlock[-1][2] == "*" or "N" in rBlock[-1][9]:
+                            cf += 2
                             rBlock.pop()
                             rBlock2.pop()
                             continue
                     elif rBlock[-1][2] == "*" and rBlock2[-1][2] == "*":
+                        cu += 1
                         UM.write('\t'.join(rBlock[-1]))
                         UM.write('\t'.join(rBlock2[-1]))
                         rBlock.pop()
@@ -529,10 +551,13 @@ def parseUniqPE(tempFile, winSize, cnn_scores, AS, rc, keep, r2, parse):
             #If different read, assign it to a file
             else:
                 if len(rBlock) == 1 and rBlock[-1][2] == "*" and rBlock2[-1][2] == "*":
+                    cu += 1
                     UM.write('\t'.join(rBlock[-1]))
                     UM.write('\t'.join(rBlock2[-1]))
                 if len(rBlock) == 1:
-                    genLandCur = readAssignPE(rBlock, rBlock2, UM, winSize, genLandCur, model, cnn_scores, rc, rmz, modelName, parse)
+                    cu += 1
+                    UM.write('\t'.join(rBlock[-1]))
+                    UM.write('\t'.join(rBlock2[-1]))
                 else:
                     for i in range(0,len(rBlock)):
                         MM.write('\t'.join(rBlock[i]))
@@ -569,7 +594,9 @@ def parseUniqPE(tempFile, winSize, cnn_scores, AS, rc, keep, r2, parse):
             B.write('\t'.join(k))
     if b == 1:
         if len(rBlock) == 1:
-            genLandCur = readAssignPE(rBlock, rBlock2, UM, winSize, genLandCur, model, cnn_scores, rc, rmz, modelName, parse)
+            UM.write('\t'.join(rBlock[-1]))
+            UM.write('\t'.join(rBlock2[-1]))
+            cu += 1
         #Put multimapped reads into a file
         if len(rBlock) > 1:
             for i in range(0,len(rBlock)):
@@ -581,30 +608,12 @@ def parseUniqPE(tempFile, winSize, cnn_scores, AS, rc, keep, r2, parse):
     if b == 0:
         B.close()
     os.remove(tempFile) #Removing old temp
-    return genLandCur
+    return [cu, cf]
 
 
 #Assign reads (straight to dictionary for uniq and actual assign for multi-mapped)
-def readAssignPE(rBlock, rBlock2, samOut, winSize, genLand, model, cnn_scores, rc, rmz, modelName, parse):
+def readAssignPE(rBlock, rBlock2, samOut, winSize, genLand, model, cnn_scores, rc, rmz, modelName):
     random.seed(7)      #To make results reproducible
-    
-    ##Uniquely mapped reads##
-    if len(rBlock) == 1:
-        #Adding to file
-        samOut.write('\t'.join(rBlock[0]))
-        samOut.write('\t'.join(rBlock2[0]))
-        if parse == 1:
-            return genLand
-        #Adding to genetic landscape
-        key = rBlock[0][2] + ";" + str(int(rBlock[0][3]))
-        if key in genLand and not parse == 1:
-            genLand[key] = genLand[key] + 1
-        else:
-            genLand[key] = 1
-        return genLand
-        
-
-    
     ##Multi-mapped reads##
     ###CNN###
     scores_rc = []
@@ -643,7 +652,7 @@ def readAssignPE(rBlock, rBlock2, samOut, winSize, genLand, model, cnn_scores, r
     
     #Removing reads that mapped to all zero regions
     if allZ and rmz == 1:
-        return genLand
+        return
         
     ##Choosing which read to keep based on probabilities from nearby read counts
     #List clean up
@@ -673,12 +682,11 @@ def readAssignPE(rBlock, rBlock2, samOut, winSize, genLand, model, cnn_scores, r
         rBlock2[choice].append("ZZ:Z:" + str(len(rBlock)) + "\n")
     samOut.write('\t'.join(rBlock[choice]))
     samOut.write('\t'.join(rBlock2[choice]))
-    return genLand
-
+    return
 
 
 def parseMultiPE(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rmz, maxa):
-    parse = 0
+    numLoc = [0,0] #Retain info on number of mapping sites
     #Getting trained CNN and making sure there is a compatible tensorflow installed
     try:
         json_file = open(modelName+'.json', 'r')
@@ -696,7 +704,7 @@ def parseMultiPE(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rm
 
     #Exception that causes errors
     if os.stat(tempFile+"MM").st_size == 0:
-        return
+        return numLoc
     
     #File with MM allocations
     AL = open(tempFile + "AL","w+")
@@ -755,7 +763,9 @@ def parseMultiPE(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rm
             else:
                 if maxa is not None and len(rBlock) > maxa:
                     continue
-                genLand = readAssignPE(rBlock, rBlock2, AL, winSize, genLand, model, cnn_scores, rc, rmz, modelName, parse)
+                readAssignPE(rBlock, rBlock2, AL, winSize, genLand, model, cnn_scores, rc, rmz, modelName)
+                numLoc[0] = (numLoc[0]*numLoc[1] + len(rBlock)) / (numLoc[1]+1)
+                numLoc[1] = numLoc[1] + 1
                 rBlock = []
                 rBlock2 = []
                 rBlock.append(r)
@@ -765,8 +775,11 @@ def parseMultiPE(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rm
 
     #For last read
     if maxa is None or len(rBlock) <= maxa:
-        genLand = readAssignPE(rBlock, rBlock2, AL, winSize, genLand, model, cnn_scores, rc, rmz, modelName, parse)
+        readAssignPE(rBlock, rBlock2, AL, winSize, genLand, model, cnn_scores, rc, rmz, modelName)
+        numLoc[0] = (numLoc[0]*numLoc[1] + len(rBlock)) / (numLoc[1]+1)
+        numLoc[1] = numLoc[1] + 1
 
     os.remove(tempFile) #Removing old temp
     AL.close()
     
+    return numLoc

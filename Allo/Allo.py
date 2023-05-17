@@ -13,7 +13,7 @@ parser.add_argument('-seq', type=str, nargs=1, help='Single-end or paired-end se
                    choices=['pe','se'], required=True, dest='seq')
 parser.add_argument('-o', type=str, nargs=1, help='Output file name', dest='outfile', default=None)
 parser.add_argument('--mixed', help='Use CNN trained on a dataset with mixed peaks, narrow by default', action='store_true', default=None)
-parser.add_argument('-t', type=int, nargs=1, help='Number of threads, 1 by default', dest='threads', default=None)
+parser.add_argument('-p', type=int, nargs=1, help='Number of processes, 1 by default', dest='processes', default=None)
 parser.add_argument('-max', type=int, nargs=1, help='Maximum value for number of locations a read can map', dest='maxlocations', default=None)
 parser.add_argument('--keep-unmap', help='Keep unmapped reads and reads that include N in their sequence', action='store_true', default=None)
 parser.add_argument('--remove-zeros', help='Disregard multi-mapped reads that map to regions with 0 uniquely mapped reads (random assignment)', action='store_true', default=None)
@@ -38,6 +38,7 @@ import glob
 import pysam
 import shutil
 
+
 #Function for concatenating files
 def cat(files, outname):
     with open(outname,'wb') as wfd:
@@ -48,6 +49,7 @@ def cat(files, outname):
 ##Main Method##          
 if __name__ == '__main__':
     
+    print("\nRunning Allo version 1.0\n\n")
     
     #Make a folder to store all temp files in allo
     ids = str(randint(0, 10000))
@@ -82,8 +84,8 @@ if __name__ == '__main__':
         m = os.path.dirname(sys.argv[0])+"/narrow"
         winSize = 500
     #Number of threads
-    if args.threads is not None:
-        thr = args.threads[0]
+    if args.processes is not None:
+        thr = args.processes[0]
     else:
         thr = 1
     #Single or paired end
@@ -147,8 +149,6 @@ if __name__ == '__main__':
         print("Warning: PG tag with collate not present in header. File does not appear to be sorted.")
         print("Please use Samtools collate before running Allo. To ignore this warning use argument --ignore")
         sys.exit(0)
-    elif collate == 0 and ig == 1:
-        print("Suppressed warning: PG tag not present in header. File does not appear to be sorted.")
 
     
     #Need list of file names
@@ -201,13 +201,9 @@ if __name__ == '__main__':
     if seq == 1:
         #PHASE I: Parsing unique reads and putting into dictionary
         cnn_scores = {} #Used to keep some previous scores for places in the genome by the cnn to save time
-        output = Parallel(n_jobs=thr)(delayed(allocation.parseUniq)(i, winSize, cnn_scores, AS, rc, keep, parse) for i in tempList)
-        #Updating genetic landscape with uniquely mapped reads
-        genLand = {}
-        for d in output:
-            genLand.update(d)
+        info = Parallel(n_jobs=thr)(delayed(allocation.parseUniq)(i, winSize, cnn_scores, AS, rc, keep) for i in tempList)
         #Need to run allocation on border reads
-        if len(tempList) > 1:
+        if len(tempList) >= 1:
             l = []
             for i in tempList:
                 if os.path.exists(str(i)+"B"):
@@ -215,9 +211,8 @@ if __name__ == '__main__':
             cat(l,tempList[0]+".borders")
         else:
             os.rename(tempList[0] + 'B', tempList[0]+".borders")
-            
-        borderDict = allocation.parseUniq(tempList[0]+".borders", winSize, cnn_scores, AS, rc, keep, parse)
-        d.update(borderDict)
+        
+        info.append(allocation.parseUniq(tempList[0]+".borders", winSize, cnn_scores, AS, rc, keep))
         #Cat with first MM file 
         cat([tempList[0]+'MM', tempList[0]+'.bordersMM'], tempList[0]+'.catborders')
         #Fix name
@@ -228,10 +223,16 @@ if __name__ == '__main__':
         os.rename(tempList[0]+".catborders", tempList[0]+"UM")
         #Remove old files
         for filename in glob.glob('./*borders*'):
-            os.remove(filename) 
-        
-        #Stopping if parsing only
-        if parse == 1:
+            os.remove(filename)
+            
+        #Add all values to UMR dictionary
+        genLand = {}
+        if parse == 0: 
+            for i in tempList:
+                if os.path.exists(str(i)+"UM"):
+                    allocation.addToDict(str(i)+"UM", genLand, seq)
+            
+        else: #Stopping if parsing only
             l = [allo_dir+"/header"]
             for i in tempList:
                 if os.path.exists(str(i)+"UM"):
@@ -244,10 +245,11 @@ if __name__ == '__main__':
             cat(l, args.input[:-4]+".allo.MMR_only.sam")
             shutil.rmtree(allo_dir)
             sys.exit(0)
+            
+        print("Parsing finished!\n")
         
         #PHASE II: Parsing multi-mapped reads
-        output = []
-        output = Parallel(n_jobs=thr)(delayed(allocation.parseMulti)(i, winSize, genLand, m, cnn_scores, rc, keep, rmz, maxa) for i in tempList)
+        info2 = Parallel(n_jobs=thr)(delayed(allocation.parseMulti)(i, winSize, genLand, m, cnn_scores, rc, keep, rmz, maxa) for i in tempList)
         
         
         #Final parsing and file clean up
@@ -260,6 +262,22 @@ if __name__ == '__main__':
         cat(l, outfile)
         
         shutil.rmtree(allo_dir)
+        
+        #Print out useful info
+        print("Allocation finished!\n")
+        run = [0,0,0,0]
+        for i in info:
+            run[0] = run[0] + i[0]
+            run[1] = run[1] + i[1]
+        for i in info2:
+            run[2] = run[2] + i[0]
+            run[3] = run[3] + i[1]
+        run[2] = math.ceil(run[2]/len(info2))
+        print("Total uniquely mapped reads analyzed: " + str(run[0]))
+        print("Total number of reads allocated: " + str(run[3]))
+        print("Total number of reads filtered (use --keep-unmap to disable filtering): " + str(run[1]))
+        print("Average number of alignments for reads (affected by -max): " + str(run[2])+"\n\n\n")
+        
 
         
     
@@ -268,13 +286,10 @@ if __name__ == '__main__':
     
         #PHASE I: Parsing unique reads and putting into dictionary
         cnn_scores = {} #Used to keep some previous scores for places in the genome by the cnn to save time
-        output = Parallel(n_jobs=thr)(delayed(allocation.parseUniqPE)(i, winSize, cnn_scores, AS, rc, keep, r2, parse) for i in tempList)
-        #Updating genetic landscape with uniquely mapped reads
-        genLand = {}
-        for d in output:
-            genLand.update(d)
+        info = Parallel(n_jobs=thr)(delayed(allocation.parseUniqPE)(i, winSize, cnn_scores, AS, rc, keep, r2) for i in tempList)
+        
         #Need to run allocation on border reads
-        if len(tempList) > 1:
+        if len(tempList) >= 1:
             l = []
             for i in tempList:
                 if os.path.exists(str(i)+"B"):
@@ -282,8 +297,7 @@ if __name__ == '__main__':
             cat(l, tempList[0]+".borders")
         else:
             os.rename(tempList[0]+'B', tempList[0]+".borders")   
-        borderDict = allocation.parseUniqPE(tempList[0]+".borders", winSize, cnn_scores, AS, rc, keep, r2, parse)
-        d.update(borderDict)
+        info.append(allocation.parseUniqPE(tempList[0]+".borders", winSize, cnn_scores, AS, rc, keep, r2))
         #Cat with first MM file 
         cat([tempList[0]+'MM', tempList[0]+'.bordersMM'], tempList[0]+'.catborders')
         #Fix name
@@ -293,8 +307,13 @@ if __name__ == '__main__':
         #Fix name
         os.rename(tempList[0]+".catborders", tempList[0]+"UM")
         
-        #Stopping if parsing only
-        if parse == 1:
+        #Add all values to UMR dictionary unless only parsing
+        genLand = {}
+        if parse == 0: 
+            for i in tempList:
+                if os.path.exists(str(i)+"UM"):
+                    allocation.addToDict(str(i)+"UM", genLand, seq)
+        else:
             l = [allo_dir+"/header"]
             for i in tempList:
                 if os.path.exists(str(i)+"UM"):
@@ -307,11 +326,11 @@ if __name__ == '__main__':
             cat(l, args.input[:-4]+".allo.MMR_only.sam")
             shutil.rmtree(allo_dir)
             sys.exit(0)
+            
+        print("Parsing finished!\n")
         
         #PHASE II: Parsing multi-mapped reads
-        output = []
-        output = Parallel(n_jobs=thr)(delayed(allocation.parseMultiPE)(i, winSize, genLand, m, cnn_scores, rc, keep, rmz, maxa) for i in tempList)
-        
+        info2 = Parallel(n_jobs=thr)(delayed(allocation.parseMultiPE)(i, winSize, genLand, m, cnn_scores, rc, keep, rmz, maxa) for i in tempList)
         
         #Final parsing and file clean up
         #Deleting temporary files and join allocated files
@@ -323,3 +342,18 @@ if __name__ == '__main__':
         cat(l, outfile)
         
         shutil.rmtree(allo_dir)
+        
+        #Print out useful info
+        print("Allocation finished!\n")
+        run = [0,0,0,0]
+        for i in info:
+            run[0] = run[0] + i[0]
+            run[1] = run[1] + i[1]
+        for i in info2:
+            run[2] = run[2] + i[0]
+            run[3] = run[3] + i[1]
+        run[2] = math.ceil(run[2]/len(info2))
+        print("Total uniquely mapped pairs analyzed: " + str(run[0]))
+        print("Total number of pairs allocated: " + str(run[3]))
+        print("Total number of reads filtered (use --keep-unmap to disable filtering): " + str(run[1]))
+        print("Average number of alignments for multi-mapped pairs (affected by -max): " + str(run[2])+"\n\n\n")

@@ -38,7 +38,7 @@ def predictNN(counts, winSize, model):
         return pred.numpy()[0][0]
 
     except:
-        print("Could not predict with Tensorflow model :( Allo was written with Tensorflow version 2.9")
+        print("Could not predict with Tensorflow model :( Allo was written with Tensorflow version 2.11")
         sys.exit(0)
 
 

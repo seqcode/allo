@@ -299,7 +299,7 @@ def parseMulti(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rmz,
         else:
             modelName = 0
     except:
-        print("Could not load Tensorflow model :( Allo was written with Tensorflow version 2.8")
+        print("Could not load Tensorflow model :( Allo was written with Tensorflow version 2.11")
         sys.exit(0)
 
     #Exception that causes errors
@@ -698,7 +698,7 @@ def parseMultiPE(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rm
         else:
             modelName = 0
     except:
-        print("Could not load Tensorflow model :( Allo was written with Tensorflow version 2.8")
+        print("Could not load Tensorflow model :( Allo was written with Tensorflow version 2.11")
         sys.exit(0)
 
     #Exception that causes errors

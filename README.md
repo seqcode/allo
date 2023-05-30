@@ -44,7 +44,7 @@ samtools collate -o ALIGNEROUTPUT_SORT.SAM ALIGNEROUTPUT_FILTER.SAM
 ## Running Allo
 The basic command for Allo:
 ```
-python PATH/Allo/Allo.py ALIGNEROUTPUT_SORT.SAM -seq PAIRED_OR_SINGLE -o OUTPUTNAME -m MIXED_OR_NARROW_PEAKS
+python PATH/Allo/allo ALIGNEROUTPUT_SORT.SAM -seq PAIRED_OR_SINGLE -o OUTPUTNAME -m MIXED_OR_NARROW_PEAKS
 ```
 Allo also accepts BAM files as input. See other options below..
 

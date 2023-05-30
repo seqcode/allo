@@ -1,4 +1,4 @@
-from . import predictPeak.py
-from . import allocation.py
+from . import predictPeak
+from . import allocation
 
 __version__ = '1.0'

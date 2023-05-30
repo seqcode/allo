@@ -30,13 +30,15 @@ from joblib import Parallel, delayed
 import multiprocessing
 import subprocess
 import os
-import allocation
+from Allo import allocation
 import math
 from random import randint
 import shutil
 import glob
 import pysam
 import shutil
+import pkgutil
+import Allo
 
 
 #Function for concatenating files
@@ -78,10 +80,12 @@ if __name__ == '__main__':
         outfile = args.input[:-4] + ".allo.sam"
     #Model and window size
     if args.mixed is not None:
-        m = os.path.dirname(sys.argv[0])+"/mixed"
+        d = os.path.dirname(sys.modules["Allo"].__file__)
+        m = os.path.join(d, "mixed")
         winSize = 500
     else:
-        m = os.path.dirname(sys.argv[0])+"/narrow"
+        d = os.path.dirname(sys.modules["Allo"].__file__)
+        m = os.path.join(d, "narrow")
         winSize = 500
     #Number of threads
     if args.processes is not None:

@@ -2,8 +2,7 @@
 #Last updated 03.01.2023
 #Contains methods for read allocation procedure of Allo.
 
-from memory_profiler import profile
-import predictPeak
+from Allo import predictPeak
 import math
 import random
 import os

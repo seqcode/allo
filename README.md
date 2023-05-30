@@ -62,7 +62,7 @@ Tip: It is recommended to run Allo on both the control and target sequencing fil
 | -o  | any string | Output file name  |
 | -seq | "se" "pe" | Single-end or paired-end sequencing mode, REQUIRED | 
 | -m  | "mixed" "narrow" | Use CNN trained on either a narrow peak dataset or a dataset with mixed peaks, narrow by default |
-| -t  | any int | Number of threads, 1 by default |
+| -p  | any int | Number of processes, 1 by default |
 | --keep-unmap |  | Keep unmapped reads and reads that include N in their sequence | 
 | --remove-zeros |  | Do not report multi-mapped reads that map to regions with 0 uniquely mapped reads (random assignment) |
 | -max | any int | Maximum value for number of locations a read can map to |

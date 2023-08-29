@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(
-	name='Allo',
+	name='bio-allo',
 	version='1.0',
 	author='Alexis Morrissey',
 	author_email='anm5579@psu.edu',
@@ -11,10 +11,11 @@ setup(
 	url='https://github.com/seqcode/allo/',
 	license='LICENSE.txt',
 	description='A multi-mapped read rescue strategy for ChIP-seq data',
-	install_requires=[
-		'numpy >= 1.23.1',
-    'joblib >= 1.1.0',
-    'tensorflow == 2.11',
-    'pysam == 0.20.0'
+	include_package_data = True,
+        install_requires=[
+	'numpy >= 1.23.1',
+        'joblib >= 1.1.0',
+        'tensorflow == 2.11',
+        'pysam == 0.20.0'
 	]
 )

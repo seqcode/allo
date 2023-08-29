@@ -13,7 +13,7 @@ setup(
 	description='A multi-mapped read rescue strategy for ChIP-seq data',
 	include_package_data = True,
         install_requires=[
-	'numpy >= 1.23.1',
+	'numpy == 1.23',
         'joblib >= 1.1.0',
         'tensorflow == 2.11',
         'pysam == 0.20.0'

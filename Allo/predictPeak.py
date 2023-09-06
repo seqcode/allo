@@ -1,4 +1,4 @@
-#!/bin/bash python
+#!/usr/bin/env python
 #Lexi Morrissey, Mahony Lab @ Pennsylvania State University
 #Last updated 03.01.2023
 #Contains method for predicting whether area should receive multimapped reads via pre-trained CNN in Allo.

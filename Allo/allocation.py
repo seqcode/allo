@@ -1,4 +1,4 @@
-#!/bin/bash python
+#!/usr/bin/env python
 #Lexi Morrissey, Mahony Lab @ Pennsylvania State University
 #Last updated 03.01.2023
 #Contains methods for read allocation procedure of Allo.

@@ -1,4 +1,4 @@
-#!/bin/bash python
+#!/usr/bin/env python
 #Lexi Morrissey, Mahony Lab @ Pennsylvania State University
 #Last updated 03.06.2023
 #Main method for Allo. Splits the sam files up and sends them to allocation procedure via multiprocessing package.

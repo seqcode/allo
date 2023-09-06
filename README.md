@@ -1,5 +1,10 @@
 # Usage
-## Required imports
+## Installation and dependencies
+
+Allo is available on PyPI
+
+[![PyPI version](https://badge.fury.io/py/bio-allo.svg)](https://badge.fury.io/py/bio-allo)
+
 Allo was written with the following imported packages. All other packages used are built into Python. Especially concerning Tensorflow, it is recommended to create a conda environment specific to this version as Allo may not function without it:
 
 joblib	1.1.0
@@ -44,7 +49,7 @@ samtools collate -o ALIGNEROUTPUT_SORT.SAM ALIGNEROUTPUT_FILTER.SAM
 ## Running Allo
 The basic command for Allo:
 ```
-python PATH/Allo/allo ALIGNEROUTPUT_SORT.SAM -seq PAIRED_OR_SINGLE -o OUTPUTNAME -m MIXED_OR_NARROW_PEAKS
+allo ALIGNEROUTPUT_SORT.SAM -seq PAIRED_OR_SINGLE -o OUTPUTNAME -m MIXED_OR_NARROW_PEAKS
 ```
 Allo also accepts BAM files as input. See other options below..
 

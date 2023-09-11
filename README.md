@@ -8,7 +8,6 @@ A multi-mapped read rescue strategy for peak-based gene regulatory analyses.
 
 [![Anaconda-Server Badge](https://anaconda.org/bioconda/allo/badges/version.svg)](https://anaconda.org/bioconda/allo)
 [![Anaconda-Server Badge](https://anaconda.org/bioconda/allo/badges/downloads.svg)](https://anaconda.org/bioconda/allo)
-[![Anaconda-Server Badge](https://anaconda.org/bioconda/allo/badges/license.svg)](https://anaconda.org/bioconda/allo)
 
 ```
 conda install -c bioconda allo

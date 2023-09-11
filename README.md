@@ -92,5 +92,5 @@ Tip: It is recommended to run Allo on both the control and target sequencing fil
 | --parser |  | Allo utility that produces separate files for unique and multi-mapped reads from a SAM or BAM file. Bowtie2 and BWA will output all alignments that meet the given threshold even if one alignment has the highest score. |
 
 
-## Contact information
-Please contact Alexis Morrissey (anm5579@psu.edu) with any questions or issues concerning Allo.
+## Help and contact information
+Please contact Alexis Morrissey (anm5579@psu.edu) with any questions concerning Allo or open an issue here on GitHub. 

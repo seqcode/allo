@@ -20,18 +20,6 @@ cd allo
 pip install -e .
 ```
 
-### Dependencies
-
-Pip will install the following packages. Especially concerning Tensorflow, it is recommended to create a conda environment specific to this version if you are using Tensorflow outside of Allo. 
-
-tensorflow	2.11
-
-numpy		1.23.1
-
-pysam 0.20.0
-
-joblib	1.1.0
-
 ## Usage
 ### Pre-processing
 Using Allo requires a few pre-processing steps. In most ChIP pipelines, the default behavior of aligners is to assign multi-mapped reads to random locations within their mappings without retaining information on the other locations. Both Bowtie1/2 and BWA can be used for single-end. Unfortunately, BWA cannot be used for paired-end reads prior to Allo due to constraints in how it outputs multi-mapped reads. The following arguments should be used:

@@ -1,21 +1,27 @@
-# Usage
-## Installation and dependencies
+# Allo
 
-Allo is available on PyPI
+A multi-mapped read rescue strategy for peak-based gene regulatory analyses.
+
+## Installation
+
+### Using PyPI and pip
 
 [![PyPI version](https://badge.fury.io/py/bio-allo.svg)](https://badge.fury.io/py/bio-allo)
 
-Allo was written with the following imported packages. All other packages used are built into Python. Especially concerning Tensorflow, it is recommended to create a conda environment specific to this version as Allo may not function without it:
+```
+pip install bio-allo
+```
 
-joblib	1.1.0
+### Using git clone and pip
 
-numpy		1.23.1
+```
+git clone https://github.com/seqcode/allo.git
+cd allo
+pip install -e .
+```
 
-tensorflow	2.11
-
-pysam 0.20.0
-
-## Pre-processing
+## Usage
+### Pre-processing
 Using Allo requires a few pre-processing steps. In most ChIP pipelines, the default behavior of aligners is to assign multi-mapped reads to random locations within their mappings without retaining information on the other locations. Both Bowtie1/2 and BWA can be used for single-end. Unfortunately, BWA cannot be used for paired-end reads prior to Allo due to constraints in how it outputs multi-mapped reads. The following arguments should be used:
 
 *Bowtie1*
@@ -46,7 +52,7 @@ Finally, the output of the aligners must be sorted by read name in order to use 
 samtools collate -o ALIGNEROUTPUT_SORT.SAM ALIGNEROUTPUT_FILTER.SAM
 ```
 
-## Running Allo
+### Running Allo
 The basic command for Allo:
 ```
 allo ALIGNEROUTPUT_SORT.SAM -seq PAIRED_OR_SINGLE -o OUTPUTNAME -m MIXED_OR_NARROW_PEAKS
@@ -55,13 +61,19 @@ Allo also accepts BAM files as input. See other options below..
 
 During each run, Allo will create temporary files as it allocates the data. UM files are reads designated as uniquely mapped (has to be parsed in Bowtie2 or BWA). MM files are unallocated multi-mapped reads. AL files are allocated reads. Checking the size of the AL files during the run will give you an estimate of how many reads have already been allocated at that time.
 
-## Post-processing and tips
+Very short test files are supplied to make sure Allo runs to completion on your machine. Imports can take a minute so be patient. Using the paired-end example:
+
+```
+allo testRunPE.sam -seq pe
+```
+
+### Post-processing and tips
 Allo adds a ZA tag to every MMR that is allocated. For reads that are allocated to regions that all contain 0 UMRs (random assignment), a ZZ tag is used instead. This allows users to remove reads that only map to zero UMR regions if they wish. The value within either tag corresponds to the number of places a read/pair mapped to. In order to get only uniquely mapped reads, grep could be used with the -v option to exclude lines with ZA or ZZ tags. On the same note, awk can used to filter reads with a specific number of mapping locations (can also be done with the -max option within Allo). Outside of adding these tags, Allo does not change anything within the read alignment columns for allocated reads.
 
 Tip: It is recommended to run Allo on both the control and target sequencing files in order to balance out background in the samples. We recommend running Allo using the --random argument on the control file. This generally results in higher confidence peaks.
 
 
-## Options
+### Options
 | Argument  | Options | Explanation |
 | ------------- | ------------- | ------------- |
 | -o  | any string | Output file name  |
@@ -78,9 +90,6 @@ Tip: It is recommended to run Allo on both the control and target sequencing fil
 | --ignore |  | Ignore warning about read sorting |
 | --parser |  | Allo utility that produces separate files for unique and multi-mapped reads from a SAM or BAM file. Bowtie2 and BWA will output all alignments that meet the given threshold even if one alignment has the highest score. |
 
-
-## Test files
-Very short test files are supplied to make sure Allo runs to completion on your machine. Imports can take a minute so be patient.
 
 ## Contact information
 Please contact Alexis Morrissey (anm5579@psu.edu) with any questions or issues concerning Allo.

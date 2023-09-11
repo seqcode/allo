@@ -4,23 +4,14 @@ A multi-mapped read rescue strategy for peak-based gene regulatory analyses.
 
 ## Installation
 
-### Bioconda
+### Package managers
 
-[![Anaconda-Server Badge](https://anaconda.org/bioconda/allo/badges/version.svg)](https://anaconda.org/bioconda/allo)
+*  Bioconda: [![Anaconda-Server Badge](https://anaconda.org/bioconda/allo/badges/version.svg)](https://anaconda.org/bioconda/allo)
 [![Anaconda-Server Badge](https://anaconda.org/bioconda/allo/badges/downloads.svg)](https://anaconda.org/bioconda/allo)
 
-```
-conda install -c bioconda allo
-```
 
+*  PyPI: [![PyPI version](https://badge.fury.io/py/bio-allo.svg)](https://badge.fury.io/py/bio-allo)
 
-### PyPI and pip
-
-[![PyPI version](https://badge.fury.io/py/bio-allo.svg)](https://badge.fury.io/py/bio-allo)
-
-```
-pip install bio-allo
-```
 
 ### Git clone and pip
 

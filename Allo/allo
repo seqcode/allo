@@ -14,6 +14,7 @@ parser.add_argument('-seq', type=str, nargs=1, help='Single-end or paired-end se
                    choices=['pe','se'], required=True, dest='seq')
 parser.add_argument('-o', type=str, nargs=1, help='Output file name', dest='outfile', default=None)
 parser.add_argument('--mixed', help='Use CNN trained on a dataset with mixed peaks, narrow by default', action='store_true', default=None)
+parser.add_argument('--rna', help='Use CNN trained on a dataset with mixed peaks, narrow by default', action='store_true', default=None)
 parser.add_argument('-p', type=int, nargs=1, help='Number of processes, 1 by default', dest='processes', default=None)
 parser.add_argument('-max', type=int, nargs=1, help='Maximum value for number of locations a read can map', dest='maxlocations', default=None)
 parser.add_argument('--keep-unmap', help='Keep unmapped reads and reads that include N in their sequence', action='store_true', default=None)
@@ -84,6 +85,10 @@ if __name__ == '__main__':
         d = os.path.dirname(sys.modules["Allo"].__file__)
         m = os.path.join(d, "mixed")
         winSize = 500
+    elif args.rna is not None:
+        d = os.path.dirname(sys.modules["Allo"].__file__)
+        m = os.path.join(d, "rna")
+        winSize = 1000
     else:
         d = os.path.dirname(sys.modules["Allo"].__file__)
         m = os.path.join(d, "narrow")

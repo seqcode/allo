@@ -15,7 +15,6 @@ import math
 
 
 def predictNN(counts, winSize, model):
-    winSize = math.floor(winSize/5) #Genome is already binned 5bps
     pic = np.zeros((100, 100), float)
     if sum(counts) == 0:
         pred = model(pic.reshape(-1,100,100), training=False)
@@ -40,6 +39,7 @@ def predictNN(counts, winSize, model):
         return pred.numpy()[0][0]
 
     except:
+        print("Prediction error.", flush=True)
         print("Could not predict with Tensorflow model :( Allo was written with Tensorflow version 2.11")
         sys.exit(0)
 

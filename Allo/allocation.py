@@ -292,7 +292,7 @@ def parseUniq(tempFile, winSize, cnn_scores, AS, rc, keep):
     return [cu, cf]
 
 
-def parseMulti(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rmz, maxa):
+def parseMulti(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rmz, maxa):   
     numLoc = [0,0] #Keep info on average number of places read maps to
     #Getting trained CNN
     try:
@@ -306,6 +306,7 @@ def parseMulti(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rmz,
         else:
             modelName = 0
     except:
+        print("Model loading error", flush=True)
         print("Could not load Tensorflow model :( Allo was written with Tensorflow version 2.11")
         sys.exit(0)
 
@@ -705,6 +706,7 @@ def parseMultiPE(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rm
         else:
             modelName = 0
     except:
+        print("PE model load error")
         print("Could not load Tensorflow model :( Allo was written with Tensorflow version 2.11")
         sys.exit(0)
 

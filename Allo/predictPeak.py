@@ -28,7 +28,7 @@ def predictNN(counts, winSize, model):
         if i == binTotal-1:
             binned.append(np.sum(counts[position:len(counts)]))
         else:
-            binned.append(np.sum(counts[position:position+5]))
+            binned.append(np.sum(counts[position:position+binSize]))
   
     binned = (99*(binned - np.min(binned))/np.ptp(binned)).astype(int) 
     for i in range(0,len(binned)):

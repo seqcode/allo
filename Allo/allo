@@ -88,7 +88,7 @@ if __name__ == '__main__':
     elif args.rna is not None:
         d = os.path.dirname(sys.modules["Allo"].__file__)
         m = os.path.join(d, "rna")
-        winSize = 1000
+        winSize = 500
     else:
         d = os.path.dirname(sys.modules["Allo"].__file__)
         m = os.path.join(d, "narrow")

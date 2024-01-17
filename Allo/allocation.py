@@ -31,6 +31,9 @@ def addToDict(tempFile, genLand, seq):
             count = count + 1
             if seq == 0 and not (count % 2) == 0:
                 continue
+            #Getting closest 5bp window
+            l[3] = round(int(l[3])/5)*5
+            #Add to dictionary
             key = l[2] + ";" + str(l[3])
             if key in genLand:
                 genLand[key] = genLand[key] + 1
@@ -41,13 +44,16 @@ def addToDict(tempFile, genLand, seq):
 def getArray(read, winSize, genLand):
     array = []
     pos = round(int(read[3])/100)*100
-    for k in range (pos-math.floor(winSize/2),int(pos)+math.floor(winSize/2)):
+    k = pos-math.floor(winSize/2)
+    while k < int(pos)+math.floor(winSize/2):
+        k = round(k/5)*5
         key = read[2] + ";" + str(k)
         #Seeing if current pos in genetic landscape
         if key in genLand:
             array.append(genLand[key])
         else:
             array.append(0)
+        k = k + 5
     return array
 
 

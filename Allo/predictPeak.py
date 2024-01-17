@@ -15,6 +15,7 @@ import math
 
 
 def predictNN(counts, winSize, model):
+    winSize = math.floor(winSize/5) #Genome is already binned 5bps
     pic = np.zeros((100, 100), float)
     if sum(counts) == 0:
         pred = model(pic.reshape(-1,100,100), training=False)

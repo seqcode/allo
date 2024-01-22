@@ -28,7 +28,7 @@ def predictNN(counts, winSize, model):
         if i == binTotal-1:
             binned.append(np.sum(counts[position:len(counts)]))
         else:
-            binned.append(np.sum(counts[position:position+binSize]))
+            binned.append(np.sum(counts[position:position+5]))
   
     binned = (99*(binned - np.min(binned))/np.ptp(binned)).astype(int) 
     for i in range(0,len(binned)):
@@ -39,9 +39,5 @@ def predictNN(counts, winSize, model):
         return pred.numpy()[0][0]
 
     except:
-        print("Prediction error.", flush=True)
         print("Could not predict with Tensorflow model :( Allo was written with Tensorflow version 2.11")
         sys.exit(0)
-
-
-

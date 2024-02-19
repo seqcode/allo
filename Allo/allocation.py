@@ -16,10 +16,10 @@ import time
 import numpy as np
 import sys
 import multiprocessing
-
+import re
 
 #Add reads to UMR dictionary
-def addToDict(tempFile, genLand, seq):
+def addToDict(tempFile, genLand, spliceD, seq):
     count = 0
     with open(tempFile) as f:
         for line in f:
@@ -39,26 +39,115 @@ def addToDict(tempFile, genLand, seq):
                 genLand[key] = genLand[key] + 1
             else:
                 genLand[key] = 1
+            if not spliceD == None:
+                chars = re.findall('[A-Za-z]+', l[5])
+                gaps = [i for i, x in enumerate(chars) if x == "N"]
+                if len(gaps) > 0:
+                    num = re.findall('\d+\.\d+|\d+', l[5])
+                    curLoc = int(l[3])
+                    for i in range(0,len(chars)):
+                        if chars[i]=="M" or chars[i]=="D" or chars[i]=="=" or chars[i]=="X":
+                            curLoc = curLoc + int(num[i])
+                        elif chars[i]=="N":
+                            if l[2]+";"+str(curLoc) in spliceD:
+                                if spliceD[l[2]+";"+str(curLoc)] > curLoc + int(num[i]):
+                                    pos = int(round(int(curLoc)/5)*5)
+                                    size = int(round(int(num[i])/5)*5)
+                                    spliceD[l[2]+";"+str(pos)] = size
+                                    spliceD[l[2]+";"+str(pos+size)] = size+5
+                            else:
+                                pos = int(round(int(curLoc)/5)*5)
+                                size = int(round(int(num[i])/5)*5)
+                                spliceD[l[2]+";"+str(pos)] = size
+                                #Adding splice in reverse direction
+                                spliceD[l[2]+";"+str(pos+size)] = -1*(size+5)
+                            curLoc = curLoc + int(num[i])
 
 #Used to get counts in regions around multimapped reads
-def getArray(read, winSize, genLand):
-    array = []
-    pos = round(int(read[3])/100)*100
-    k = pos-math.floor(winSize/2)
-    while k < int(pos)+math.floor(winSize/2):
-        k = round(k/5)*5
-        key = read[2] + ";" + str(k)
-        #Seeing if current pos in genetic landscape
-        if key in genLand:
-            array.append(genLand[key])
-        else:
-            array.append(0)
-        k = k + 5
+def getArray(read, winSize, genLand, spliceD):
+    bin = int(winSize/100)
+    #Spliced array using junction info
+    if spliceD:
+        #Parsing cigar string
+        chars = re.findall('[A-Za-z]+', read[5])
+        num = re.findall('\d+\.\d+|\d+', read[5])
+        gap_loc = {}
+        start = int(round(int(read[3])/bin)*bin)
+        chr = read[2]
+        r_end = start #Get information about end of read to use for splice variants
+        #print("cigar: " + read[5], flush=True)
+        for i in range(0,len(chars)):
+            if chars[i]=="M" or chars[i]=="D" or chars[i]=="=" or chars[i]=="X":
+                r_end = r_end + int(num[i])
+            elif chars[i]=="N":
+                gap_loc[int(round((int(r_end)+4)/bin)*bin)]=int(round((int(num[i])-4)/bin)*bin)
+                r_end = r_end + int(num[i])
+        r_end = int(round(int(r_end)/bin)*bin)
+        array = []
+        k = start-bin
+        l = 0
+        #Upstream counts
+        while l <= math.floor(winSize/2):
+            #print("up: " + str(k), flush=True)
+            key = chr + ";" + str(k)
+            if key in spliceD and spliceD[key] < 0:
+                #print("splice: " + str(splice[key]), flush=True)
+                k = k + spliceD[key]
+                key = chr + ";" + str(k)
+            if key in genLand:
+                array.insert(0,genLand[key])
+            else:
+                array.insert(0,0)
+            k -= bin
+            l += bin
+        start_pos = k
+        #Downstream counts 
+        k = start
+        l = 0
+        #print(gap_loc)
+        while l <= math.floor(winSize/2):
+            while k < r_end:
+                #print("down: " + str(k), flush=True)
+                key = chr + ";" + str(k)
+                if k in gap_loc:
+                    k = k + gap_loc[k]
+                    continue
+                elif key in genLand:
+                    array.append(genLand[key])
+                else:
+                    array.append(0)
+                k += bin
+                l += bin
+            #print("down2: " + str(k), flush=True)
+            key = chr + ";" + str(k)
+            if key in spliceD and spliceD[key] > 0:
+                k = k + spliceD[key]
+                key = chr + ";" + str(k)
+            if key in genLand:
+                array.append(genLand[key])
+            else:
+                array.append(0)
+            k += bin
+            l += bin
+    #Non-spliced array
+    else:
+        array = []
+        pos = int(round(int(read[3])/5)*5)
+        k = pos-math.floor(winSize/2)
+        while k < int(pos)+math.floor(winSize/2):
+            k = round(k/5)*5
+            key = read[2] + ";" + str(k)
+            #Seeing if current pos in genetic landscape
+            if key in genLand:
+                array.append(genLand[key])
+            else:
+                array.append(0)
+            k = k + 5
     return array
 
 
 #Assign reads (straight to dictionary for uniq and actual assign for multi-mapped)
-def readAssign(rBlock, samOut, winSize, genLand, model, cnn_scores, rc, rmz, modelName):
+def readAssign(rBlock, samOut, winSize, genLand, model, cnn_scores, rc, rmz, modelName, spliceD):
     random.seed(7)      #To make results reproducible
 
     ##Multi-mapped reads##
@@ -73,7 +162,7 @@ def readAssign(rBlock, samOut, winSize, genLand, model, cnn_scores, rc, rmz, mod
             scores_nn.append(cnn_scores[pos])
             allZ = False
         else:
-            countArray = getArray(i, winSize, genLand)
+            countArray = getArray(i, winSize, genLand, spliceD)
             s = sum(countArray)
             if s > 0:
                 allZ = False
@@ -292,7 +381,7 @@ def parseUniq(tempFile, winSize, cnn_scores, AS, rc, keep):
     return [cu, cf]
 
 
-def parseMulti(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rmz, maxa):   
+def parseMulti(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rmz, maxa, spliceD):   
     numLoc = [0,0] #Keep info on average number of places read maps to
     #Getting trained CNN
     try:
@@ -353,7 +442,7 @@ def parseMulti(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rmz,
                         rBlock = []
                         rBlock.append(r)
                         continue
-                    readAssign(rBlock, AL, winSize, genLand, model, cnn_scores, rc, rmz, modelName)
+                    readAssign(rBlock, AL, winSize, genLand, model, cnn_scores, rc, rmz, modelName, spliceD)
                     #Getting average number of locations mapped to
                     numLoc[0] = (numLoc[0]*numLoc[1] + len(rBlock)) / (numLoc[1]+1)
                     numLoc[1] = numLoc[1] + 1
@@ -363,7 +452,7 @@ def parseMulti(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rmz,
 
     #For last read
     if maxa is None or len(rBlock) <= maxa:
-        readAssign(rBlock, AL, winSize, genLand, model, cnn_scores, rc, rmz, modelName)
+        readAssign(rBlock, AL, winSize, genLand, model, cnn_scores, rc, rmz, modelName, spliceD)
         numLoc[0] = (numLoc[0]*numLoc[1] + len(rBlock)) / (numLoc[1]+1)
         numLoc[1] = numLoc[1] + 1
 
@@ -619,7 +708,7 @@ def parseUniqPE(tempFile, winSize, cnn_scores, AS, rc, keep, r2):
 
 
 #Assign reads (straight to dictionary for uniq and actual assign for multi-mapped)
-def readAssignPE(rBlock, rBlock2, samOut, winSize, genLand, model, cnn_scores, rc, rmz, modelName):
+def readAssignPE(rBlock, rBlock2, samOut, winSize, genLand, model, cnn_scores, rc, rmz, modelName, spliceD):
     random.seed(7)      #To make results reproducible
     ##Multi-mapped reads##
     ###CNN###
@@ -633,7 +722,7 @@ def readAssignPE(rBlock, rBlock2, samOut, winSize, genLand, model, cnn_scores, r
             scores_nn.append(cnn_scores[pos])
             allZ = False
         else:
-            countArray = getArray(i, winSize, genLand)
+            countArray = getArray(i, winSize, genLand, spliceD)
             s = sum(countArray)
             if s > 0:
                 allZ = False
@@ -692,7 +781,7 @@ def readAssignPE(rBlock, rBlock2, samOut, winSize, genLand, model, cnn_scores, r
     return
 
 
-def parseMultiPE(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rmz, maxa):
+def parseMultiPE(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rmz, maxa, spliceD):
     numLoc = [0,0] #Retain info on number of mapping sites
     #Getting trained CNN and making sure there is a compatible tensorflow installed
     try:
@@ -771,7 +860,7 @@ def parseMultiPE(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rm
             else:
                 if maxa is not None and len(rBlock) > maxa:
                     continue
-                readAssignPE(rBlock, rBlock2, AL, winSize, genLand, model, cnn_scores, rc, rmz, modelName)
+                readAssignPE(rBlock, rBlock2, AL, winSize, genLand, model, cnn_scores, rc, rmz, modelName, spliceD)
                 numLoc[0] = (numLoc[0]*numLoc[1] + len(rBlock)) / (numLoc[1]+1)
                 numLoc[1] = numLoc[1] + 1
                 rBlock = []
@@ -783,7 +872,7 @@ def parseMultiPE(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rm
 
     #For last read
     if maxa is None or len(rBlock) <= maxa:
-        readAssignPE(rBlock, rBlock2, AL, winSize, genLand, model, cnn_scores, rc, rmz, modelName)
+        readAssignPE(rBlock, rBlock2, AL, winSize, genLand, model, cnn_scores, rc, rmz, modelName, spliceD)
         numLoc[0] = (numLoc[0]*numLoc[1] + len(rBlock)) / (numLoc[1]+1)
         numLoc[1] = numLoc[1] + 1
 

@@ -32,7 +32,7 @@ def addToDict(tempFile, genLand, spliceD, seq):
             if seq == 0 and not (count % 2) == 0:
                 continue
             #Getting closest 5bp window
-            l[3] = round(int(l[3])/5)*5
+            l[3] = int(l[3]))
             #Add to dictionary
             key = l[2] + ";" + str(l[3])
             if key in genLand:
@@ -51,16 +51,16 @@ def addToDict(tempFile, genLand, spliceD, seq):
                         elif chars[i]=="N":
                             if l[2]+";"+str(curLoc) in spliceD:
                                 if spliceD[l[2]+";"+str(curLoc)] > curLoc + int(num[i]):
-                                    pos = int(round(int(curLoc)/5)*5)
-                                    size = int(round(int(num[i])/5)*5)
+                                    pos = int(curLoc)
+                                    size = int(num[i])
                                     spliceD[l[2]+";"+str(pos)] = size
-                                    spliceD[l[2]+";"+str(pos+size)] = size+5
+                                    spliceD[l[2]+";"+str(pos+size)] = size
                             else:
-                                pos = int(round(int(curLoc)/5)*5)
-                                size = int(round(int(num[i])/5)*5)
+                                pos = int(curLoc)
+                                size = int(num[i])
                                 spliceD[l[2]+";"+str(pos)] = size
                                 #Adding splice in reverse direction
-                                spliceD[l[2]+";"+str(pos+size)] = -1*(size+5)
+                                spliceD[l[2]+";"+str(pos+size)] = -1*(size)
                             curLoc = curLoc + int(num[i])
 
 #Used to get counts in regions around multimapped reads
@@ -132,17 +132,15 @@ def getArray(read, winSize, genLand, spliceD):
     #Non-spliced array
     else:
         array = []
-        pos = int(round(int(read[3])/5)*5)
+        pos = int(read[3])
         k = pos-math.floor(winSize/2)
         while k < int(pos)+math.floor(winSize/2):
-            k = round(k/5)*5
             key = read[2] + ";" + str(k)
             #Seeing if current pos in genetic landscape
             if key in genLand:
                 array.append(genLand[key])
             else:
                 array.append(0)
-            k = k + 5
     return array
 
 
@@ -159,7 +157,7 @@ def readAssign(rBlock, samOut, winSize, genLand, model, cnn_scores, rc, rmz, mod
         #Find closest 100 window, use that score instead if it's already been assigned, saves time
         pos = i[2]+str(round(int(i[3])/100)*100)
         if pos in cnn_scores:
-            scores_nn.append(cnn_scores[pos])
+            #scores_nn.append(cnn_scores[pos])
             allZ = False
         else:
             countArray = getArray(i, winSize, genLand, spliceD)
@@ -719,7 +717,7 @@ def readAssignPE(rBlock, rBlock2, samOut, winSize, genLand, model, cnn_scores, r
         #Find closest 100 window, use that score instead if it's already been assigned, saves time
         pos = i[2]+str(round(int(i[3])/100)*100)
         if pos in cnn_scores:
-            scores_nn.append(cnn_scores[pos])
+            #scores_nn.append(cnn_scores[pos])
             allZ = False
         else:
             countArray = getArray(i, winSize, genLand, spliceD)

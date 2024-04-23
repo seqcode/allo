@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #Lexi Morrissey, Mahony Lab @ Pennsylvania State University
-#Last updated 03.01.2023
+#Last updated 04.22.2024
 #Contains methods for read allocation procedure of Allo.
 
 from Allo import predictPeak
@@ -17,6 +17,9 @@ import numpy as np
 import sys
 import multiprocessing
 import re
+import absl.logging
+absl.logging.set_verbosity(absl.logging.ERROR)
+import contextlib, io
 
 #Add reads to UMR dictionary
 def addToDict(tempFile, genLand, spliceD, seq):
@@ -31,8 +34,7 @@ def addToDict(tempFile, genLand, spliceD, seq):
             count = count + 1
             if seq == 0 and not (count % 2) == 0:
                 continue
-            #Getting closest 5bp window
-            l[3] = int(l[3]))
+            l[3] = int(l[3])
             #Add to dictionary
             key = l[2] + ";" + str(l[3])
             if key in genLand:
@@ -65,14 +67,13 @@ def addToDict(tempFile, genLand, spliceD, seq):
 
 #Used to get counts in regions around multimapped reads
 def getArray(read, winSize, genLand, spliceD):
-    bin = int(winSize/100)
     #Spliced array using junction info
     if spliceD:
         #Parsing cigar string
         chars = re.findall('[A-Za-z]+', read[5])
         num = re.findall('\d+\.\d+|\d+', read[5])
         gap_loc = {}
-        start = int(round(int(read[3])/bin)*bin)
+        start = int(read[3])
         chr = read[2]
         r_end = start #Get information about end of read to use for splice variants
         #print("cigar: " + read[5], flush=True)
@@ -80,11 +81,10 @@ def getArray(read, winSize, genLand, spliceD):
             if chars[i]=="M" or chars[i]=="D" or chars[i]=="=" or chars[i]=="X":
                 r_end = r_end + int(num[i])
             elif chars[i]=="N":
-                gap_loc[int(round((int(r_end)+4)/bin)*bin)]=int(round((int(num[i])-4)/bin)*bin)
+                gap_loc[r_end+1]=int(num[i])
                 r_end = r_end + int(num[i])
-        r_end = int(round(int(r_end)/bin)*bin)
         array = []
-        k = start-bin
+        k = start
         l = 0
         #Upstream counts
         while l <= math.floor(winSize/2):
@@ -98,8 +98,8 @@ def getArray(read, winSize, genLand, spliceD):
                 array.insert(0,genLand[key])
             else:
                 array.insert(0,0)
-            k -= bin
-            l += bin
+            k -= 1
+            l += 1
         start_pos = k
         #Downstream counts 
         k = start
@@ -116,8 +116,8 @@ def getArray(read, winSize, genLand, spliceD):
                     array.append(genLand[key])
                 else:
                     array.append(0)
-                k += bin
-                l += bin
+                k += 1
+                l += 1
             #print("down2: " + str(k), flush=True)
             key = chr + ";" + str(k)
             if key in spliceD and spliceD[key] > 0:
@@ -127,14 +127,13 @@ def getArray(read, winSize, genLand, spliceD):
                 array.append(genLand[key])
             else:
                 array.append(0)
-            k += bin
-            l += bin
+            k += 1
+            l += 1
     #Non-spliced array
     else:
         array = []
-        pos = int(read[3])
-        k = pos-math.floor(winSize/2)
-        while k < int(pos)+math.floor(winSize/2):
+        pos = round(int(read[3])/100)*100
+        for k in range (pos-math.floor(winSize/2),int(pos)+math.floor(winSize/2)):
             key = read[2] + ";" + str(k)
             #Seeing if current pos in genetic landscape
             if key in genLand:
@@ -155,34 +154,28 @@ def readAssign(rBlock, samOut, winSize, genLand, model, cnn_scores, rc, rmz, mod
     allZ = True #seeing if all zero regions
     for i in rBlock:
         #Find closest 100 window, use that score instead if it's already been assigned, saves time
-        pos = i[2]+str(round(int(i[3])/100)*100)
-        if pos in cnn_scores:
-            #scores_nn.append(cnn_scores[pos])
+        pos = i[2]+str(i[3])
+        countArray = getArray(i, winSize, genLand, spliceD)
+        s = sum(countArray)
+        if s > 0:
             allZ = False
-        else:
-            countArray = getArray(i, winSize, genLand, spliceD)
-            s = sum(countArray)
-            if s > 0:
-                allZ = False
-            #Allocation options
-            if rc == 1:
-                if s == 0:
-                    scores_rc.append(1)
-                else:
-                    scores_rc.append(s+1)
-                continue
-            if rc == 2:
-                scores_rc.append(1)
-                continue
-            #Use no read score if zero region
+        #Allocation options
+        if rc == 1:
             if s == 0:
-                scores_nn.append(0.0012*(s+1))
-            elif s <= 5:
-                scores_nn.append(0.0062*(s+1))
+                scores_rc.append(1)
             else:
-                nn = predictPeak.predictNN(countArray, winSize, model)
-                scores_nn.append(nn*(s+1))
-                cnn_scores[pos] = (nn*(s+1))
+                scores_rc.append(s+1)
+            continue
+        if rc == 2:
+            scores_rc.append(1)
+            continue
+        #Use no read score if zero region
+        if s == 0:
+            scores_nn.append(0.0012*(s+1))
+        else:
+            nn = predictPeak.predictNN(countArray, winSize, model)
+            scores_nn.append(nn*(s+1))
+            cnn_scores[pos] = (nn*(s+1))
     
     #Removing reads that mapped to all zero regions
     if allZ and rmz == 1:
@@ -382,21 +375,20 @@ def parseUniq(tempFile, winSize, cnn_scores, AS, rc, keep):
 def parseMulti(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rmz, maxa, spliceD):   
     numLoc = [0,0] #Keep info on average number of places read maps to
     #Getting trained CNN
-    try:
-        json_file = open(modelName+'.json', 'r')
-        loaded_model_json = json_file.read()
-        json_file.close()
-        model = tf.keras.models.model_from_json(loaded_model_json)
-        model.load_weights(modelName+'.h5')
-        if "mixed" in modelName:
-            modelName = 1
-        else:
-            modelName = 0
-    except:
-        print("Model loading error", flush=True)
-        print("Could not load Tensorflow model :( Allo was written with Tensorflow version 2.11")
-        sys.exit(0)
-
+    if rc == 0:
+        try:
+            json_file = open(modelName+'.json', 'r')
+            loaded_model_json = json_file.read()
+            json_file.close()
+            model = tf.keras.models.model_from_json(loaded_model_json)
+            model.load_weights(modelName+'.h5')
+            model = LiteModel.from_keras_model(model)
+        except:
+            print("Could not load Tensorflow model :( Allo was written with Tensorflow version 2.11")
+            sys.exit(0)
+    else:
+        model = None
+        modelName = None
     #Exception that causes errors
     if os.stat(tempFile+"MM").st_size == 0:
         return numLoc
@@ -737,8 +729,6 @@ def readAssignPE(rBlock, rBlock2, samOut, winSize, genLand, model, cnn_scores, r
             #Use no read score if zero region
             if s == 0:
                 scores_nn.append(0.0012*(s+1))
-            elif s <= 5:
-                scores_nn.append(0.0062*(s+1))
             else:
                 nn = predictPeak.predictNN(countArray, winSize, model)
                 scores_nn.append(nn*(s+1))
@@ -782,20 +772,24 @@ def readAssignPE(rBlock, rBlock2, samOut, winSize, genLand, model, cnn_scores, r
 def parseMultiPE(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rmz, maxa, spliceD):
     numLoc = [0,0] #Retain info on number of mapping sites
     #Getting trained CNN and making sure there is a compatible tensorflow installed
-    try:
-        json_file = open(modelName+'.json', 'r')
-        loaded_model_json = json_file.read()
-        json_file.close()
-        model = tf.keras.models.model_from_json(loaded_model_json)
-        model.load_weights(modelName+'.h5')
-        if "mixed" in modelName:
-            modelName = 1
-        else:
-            modelName = 0
-    except:
-        print("PE model load error")
-        print("Could not load Tensorflow model :( Allo was written with Tensorflow version 2.11")
-        sys.exit(0)
+    if rc == 0:
+        try:
+            json_file = open(modelName+'.json', 'r')
+            loaded_model_json = json_file.read()
+            json_file.close()
+            model = tf.keras.models.model_from_json(loaded_model_json)
+            model.load_weights(modelName+'.h5')
+            model = LiteModel.from_keras_model(model)
+            if "mixed" in modelName:
+                modelName = 1
+            else:
+                modelName = 0
+        except:
+            print("Could not load Tensorflow model :( Allo was written with Tensorflow version 2.11")
+            sys.exit(0)
+    else:
+        model = None
+        modelName = None
 
     #Exception that causes errors
     if os.stat(tempFile+"MM").st_size == 0:
@@ -878,3 +872,46 @@ def parseMultiPE(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rm
     AL.close()
     
     return numLoc
+
+
+#Class to speed up tensorflow prediction
+#https://micwurm.medium.com/using-tensorflow-lite-to-speed-up-predictions-a3954886eb98
+class LiteModel:
+    @classmethod
+    def from_file(cls, model_path):
+        return LiteModel(tf.lite.Interpreter(model_path=model_path))
+    
+    @classmethod
+    def from_keras_model(cls, kmodel):
+        converter = tf.lite.TFLiteConverter.from_keras_model(kmodel)
+        tflite_model = converter.convert()
+        return LiteModel(tf.lite.Interpreter(model_content=tflite_model))
+    
+    def __init__(self, interpreter):
+        self.interpreter = interpreter
+        self.interpreter.allocate_tensors()
+        input_det = self.interpreter.get_input_details()[0]
+        output_det = self.interpreter.get_output_details()[0]
+        self.input_index = input_det["index"]
+        self.output_index = output_det["index"]
+        self.input_shape = input_det["shape"]
+        self.output_shape = output_det["shape"]
+        self.input_dtype = input_det["dtype"]
+        self.output_dtype = output_det["dtype"]
+        
+    def predict(self, inp):
+        inp = inp.astype(self.input_dtype)
+        count = inp.shape[0]
+        out = np.zeros((count, self.output_shape[1]), dtype=self.output_dtype)
+        for i in range(count):
+            self.interpreter.set_tensor(self.input_index, inp[i:i+1])
+            self.interpreter.invoke()
+            out[i] = self.interpreter.get_tensor(self.output_index)[0]
+        return out
+    
+    def predict_single(self, inp):
+        inp = np.array([inp], dtype=self.input_dtype)
+        self.interpreter.set_tensor(self.input_index, inp)
+        self.interpreter.invoke()
+        out = self.interpreter.get_tensor(self.output_index)
+        return out[0]

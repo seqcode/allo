@@ -111,6 +111,7 @@ if __name__ == '__main__':
         rc = 2
     else:
         rc = 0
+        print("Using neural network...", flush=True)
     #Keep unmapped reads
     if args.keep_unmap is not None:
         keep = 1
@@ -264,7 +265,7 @@ if __name__ == '__main__':
             shutil.rmtree(allo_dir)
             sys.exit(0)
             
-        print("Parsing finished!\n")
+        print("Parsing finished!\n", flush=True)
         
         #PHASE II: Parsing multi-mapped reads
         info2 = Parallel(n_jobs=thr)(delayed(allocation.parseMulti)(i, winSize, genLand, m, cnn_scores, rc, keep, rmz, maxa, spliceD) for i in tempList)
@@ -349,7 +350,7 @@ if __name__ == '__main__':
             shutil.rmtree(allo_dir)
             sys.exit(0)
             
-        print("Parsing finished!\n")
+        print("Parsing finished!\n", flush=True)
         
         #PHASE II: Parsing multi-mapped reads
         info2 = Parallel(n_jobs=thr)(delayed(allocation.parseMultiPE)(i, winSize, genLand, m, cnn_scores, rc, keep, rmz, maxa, spliceD) for i in tempList)

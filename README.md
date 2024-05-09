@@ -2,6 +2,8 @@
 
 A multi-mapped read rescue strategy for gene regulatory analyses.
 
+[Check out our pre-print to learn more!](https://www.biorxiv.org/content/10.1101/2023.09.12.556916v1)
+
 ### Releases
 
 As of **v1.1.0**, Allo has neural networks trained for DNase-seq and ATAC-seq under the MACS2 parameters "--nomodel --shift -100 --extsize 200" for ATAC-seq and MACS2 default parameters for DNase-seq. Additionally, Allo now has the option to remove introns as identified by splice junction information in the CIGAR string of an aligned read. This affects the window used to sum uniquely mapped reads. Information below regarding the use of Allo for RNA-seq data processing.
@@ -60,9 +62,12 @@ samtools collate -o ALIGNEROUTPUT_SORT.SAM ALIGNEROUTPUT_FILTER.SAM
 #### Running Allo
 The basic command for Allo:
 ```
-allo ALIGNEROUTPUT_SORT.SAM -seq PAIRED_OR_SINGLE -o OUTPUTNAME -m MIXED_OR_NARROW_PEAKS
+allo ALIGNEROUTPUT_SORT.SAM -seq PAIRED_OR_SINGLE -o OUTPUTNAME
 ```
 Allo also accepts BAM files as input. See other options below..
+
+#### Additional tips
+It is recommended to run Allo on both the control and target sequencing files in order to balance out background in the samples. We recommend running Allo using the --random argument on the control file. This generally results in higher confidence peaks.
 
 During each run, Allo will create temporary files as it allocates the data. UM files are reads designated as uniquely mapped (has to be parsed in Bowtie2 or BWA). MM files are unallocated multi-mapped reads. AL files are allocated reads. Checking the size of the AL files during the run will give you an estimate of how many reads have already been allocated at that time.
 
@@ -72,22 +77,19 @@ Very short test files are supplied to make sure Allo runs to completion on your 
 allo testRunPE.sam -seq pe
 ```
 
-#### Additional tips
-It is recommended to run Allo on both the control and target sequencing files in order to balance out background in the samples. We recommend running Allo using the --random argument on the control file. This generally results in higher confidence peaks.
-
 ### RNA-seq application
 #### Pre-processing and alignment
-Allo is compatible with STAR alignments. We recommend using the "--outFilterType BySJout" argument if you choose to use the "--splice" function in Allo in order to only consider high quality junctions. An example of a paired-end STAR alignment keeping up to 25 locations per read is shown below:
+Allo is compatible with STAR alignments. We recommend using the "--outFilterType BySJout" argument if you choose to use the "--splice" function in Allo in order to only consider high-quality junctions. An example of a paired-end STAR alignment, keeping up to 25 locations per read, is shown below:
 ```
 STAR --genomeDir GENOMEDIR --readFilesIn fASTQ_1 FASTQ_2 --outSAMtype BAM Unsorted --outSAMmultNmax 25 --outFilterType BySJout --outFileNamePrefix ALIGNEROUTPUT
 ```
 
-#### Running Allo
-To use Allo, first sort your file:
+Next, sort your file based on read name:
 ```
 samtools collate -o ALIGNEROUTPUT_SORT.BAM ALIGNEROUTPUT_FILTER.BAM
 ```
 
+#### Running Allo
 Following this, we recommend running Allo on read count only mode as the neural networks available are not trained on RNA-seq profiles. Additionally, the --splice argument can be used if the user would like Allo to splice introns out when summing uniquely mapped reads.
 ```
 allo ALIGNEROUTPUT_SORT.BAM -seq PAIRED_OR_SINGLE -o OUTPUTNAME --readcount --splice

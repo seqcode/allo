@@ -15,7 +15,7 @@ As of **v1.1.0**, Allo has neural networks trained for DNase-seq and ATAC-seq un
 [![Anaconda-Server Badge](https://anaconda.org/bioconda/allo/badges/downloads.svg)](https://anaconda.org/bioconda/allo)
 
 
-*  PyPI: [![PyPI version](https://badge.fury.io/py/bio-allo.svg)](https://badge.fury.io/py/bio-allo)
+*  PyPI: [![PyPI version](https://badge.fury.io/py/bio-allo.svg?v=2)](https://badge.fury.io/py/bio-allo)
 
 
 ### Git clone and pip

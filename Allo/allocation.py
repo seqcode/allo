@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 #Lexi Morrissey, Mahony Lab @ Pennsylvania State University
-#Last updated 04.22.2024
 #Contains methods for read allocation procedure of Allo.
 
 from Allo import predictPeak
@@ -79,7 +78,7 @@ def getArray(read, winSize, genLand, spliceD):
         #print("cigar: " + read[5], flush=True)
         for i in range(0,len(chars)):
             if chars[i]=="M" or chars[i]=="D" or chars[i]=="=" or chars[i]=="X":
-                r_end = r_end + int(num[i])
+                r_end = r_end + int(num[i]) - 1
             elif chars[i]=="N":
                 gap_loc[r_end+1]=int(num[i])
                 r_end = r_end + int(num[i])
@@ -90,10 +89,10 @@ def getArray(read, winSize, genLand, spliceD):
         while l <= math.floor(winSize/2):
             #print("up: " + str(k), flush=True)
             key = chr + ";" + str(k)
-            if key in spliceD and spliceD[key] < 0:
+            '''if key in spliceD and spliceD[key] < 0:
                 #print("splice: " + str(splice[key]), flush=True)
                 k = k + spliceD[key]
-                key = chr + ";" + str(k)
+                key = chr + ";" + str(k)'''
             if key in genLand:
                 array.insert(0,genLand[key])
             else:
@@ -104,10 +103,9 @@ def getArray(read, winSize, genLand, spliceD):
         #Downstream counts 
         k = start
         l = 0
-        #print(gap_loc)
         while l <= math.floor(winSize/2):
+            #Taking splice information from read if present
             while k < r_end:
-                #print("down: " + str(k), flush=True)
                 key = chr + ";" + str(k)
                 if k in gap_loc:
                     k = k + gap_loc[k]
@@ -118,11 +116,11 @@ def getArray(read, winSize, genLand, spliceD):
                     array.append(0)
                 k += 1
                 l += 1
-            #print("down2: " + str(k), flush=True)
+            #Else use previously found splice info
             key = chr + ";" + str(k)
-            if key in spliceD and spliceD[key] > 0:
+            '''if key in spliceD and spliceD[key] > 0:
                 k = k + spliceD[key]
-                key = chr + ";" + str(k)
+                key = chr + ";" + str(k)'''
             if key in genLand:
                 array.append(genLand[key])
             else:
@@ -144,7 +142,7 @@ def getArray(read, winSize, genLand, spliceD):
 
 
 #Assign reads (straight to dictionary for uniq and actual assign for multi-mapped)
-def readAssign(rBlock, samOut, winSize, genLand, model, cnn_scores, rc, rmz, modelName, spliceD):
+def readAssign(rBlock, samOut, winSize, genLand, model, cnn_scores, rc, rmz, spliceD):
     random.seed(7)      #To make results reproducible
 
     ##Multi-mapped reads##
@@ -154,28 +152,35 @@ def readAssign(rBlock, samOut, winSize, genLand, model, cnn_scores, rc, rmz, mod
     allZ = True #seeing if all zero regions
     for i in rBlock:
         #Find closest 100 window, use that score instead if it's already been assigned, saves time
-        pos = i[2]+str(i[3])
-        countArray = getArray(i, winSize, genLand, spliceD)
-        s = sum(countArray)
-        if s > 0:
-            allZ = False
-        #Allocation options
-        if rc == 1:
-            if s == 0:
-                scores_rc.append(1)
-            else:
-                scores_rc.append(s+1)
-            continue
-        if rc == 2:
-            scores_rc.append(1)
-            continue
-        #Use no read score if zero region
-        if s == 0:
-            scores_nn.append(0.0012*(s+1))
+        if spliceD:
+            pos = i[2]+";"+str(i[3])
         else:
-            nn = predictPeak.predictNN(countArray, winSize, model)
-            scores_nn.append(nn*(s+1))
-            cnn_scores[pos] = (nn*(s+1))
+            pos = i[2]+";"+str(round(int(i[3])/100)*100)
+        if pos in cnn_scores:
+            scores_nn.append(cnn_scores[pos])
+            allZ = False
+        else:
+            countArray = getArray(i, winSize, genLand, spliceD)
+            s = sum(countArray)
+            if s > 0:
+                allZ = False
+            #Allocation options
+            if rc == 1:
+                if s == 0:
+                    scores_rc.append(1)
+                else:
+                    scores_rc.append(s+1)
+                continue
+            if rc == 2:
+                scores_rc.append(1)
+                continue
+            #Use no read score if zero region
+            if s == 0:
+                scores_nn.append(0.0012*(s+1))
+            else:
+                nn = predictPeak.predictNN(countArray, winSize, model)
+                scores_nn.append(nn*(s+1))
+                cnn_scores[pos] = (nn*(s+1))
     
     #Removing reads that mapped to all zero regions
     if allZ and rmz == 1:
@@ -214,7 +219,6 @@ def parseUniq(tempFile, winSize, cnn_scores, AS, rc, keep):
     cu = 0  #UMRs
     cf = 0  #Filtered
     
-    modelName = None
     model = None
     rmz = None
     rBlock = []
@@ -388,7 +392,6 @@ def parseMulti(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rmz,
             sys.exit(0)
     else:
         model = None
-        modelName = None
     #Exception that causes errors
     if os.stat(tempFile+"MM").st_size == 0:
         return numLoc
@@ -432,7 +435,7 @@ def parseMulti(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rmz,
                         rBlock = []
                         rBlock.append(r)
                         continue
-                    readAssign(rBlock, AL, winSize, genLand, model, cnn_scores, rc, rmz, modelName, spliceD)
+                    readAssign(rBlock, AL, winSize, genLand, model, cnn_scores, rc, rmz, spliceD)
                     #Getting average number of locations mapped to
                     numLoc[0] = (numLoc[0]*numLoc[1] + len(rBlock)) / (numLoc[1]+1)
                     numLoc[1] = numLoc[1] + 1
@@ -442,7 +445,7 @@ def parseMulti(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rmz,
 
     #For last read
     if maxa is None or len(rBlock) <= maxa:
-        readAssign(rBlock, AL, winSize, genLand, model, cnn_scores, rc, rmz, modelName, spliceD)
+        readAssign(rBlock, AL, winSize, genLand, model, cnn_scores, rc, rmz, spliceD)
         numLoc[0] = (numLoc[0]*numLoc[1] + len(rBlock)) / (numLoc[1]+1)
         numLoc[1] = numLoc[1] + 1
 
@@ -457,7 +460,6 @@ def parseUniqPE(tempFile, winSize, cnn_scores, AS, rc, keep, r2):
     cu = 0
     cf = 0
     
-    modelName = None
     model = None
     rmz = None
     if "border" in tempFile:
@@ -698,7 +700,7 @@ def parseUniqPE(tempFile, winSize, cnn_scores, AS, rc, keep, r2):
 
 
 #Assign reads (straight to dictionary for uniq and actual assign for multi-mapped)
-def readAssignPE(rBlock, rBlock2, samOut, winSize, genLand, model, cnn_scores, rc, rmz, modelName, spliceD):
+def readAssignPE(rBlock, rBlock2, samOut, winSize, genLand, model, cnn_scores, rc, rmz, spliceD):
     random.seed(7)      #To make results reproducible
     ##Multi-mapped reads##
     ###CNN###
@@ -707,9 +709,12 @@ def readAssignPE(rBlock, rBlock2, samOut, winSize, genLand, model, cnn_scores, r
     allZ = True #seeing if all zero regions
     for i in rBlock:
         #Find closest 100 window, use that score instead if it's already been assigned, saves time
-        pos = i[2]+str(round(int(i[3])/100)*100)
+        if spliceD:
+            pos = i[2]+";"+str(i[3])
+        else:
+            pos = i[2]+";"+str(round(int(i[3])/100)*100)
         if pos in cnn_scores:
-            #scores_nn.append(cnn_scores[pos])
+            scores_nn.append(cnn_scores[pos])
             allZ = False
         else:
             countArray = getArray(i, winSize, genLand, spliceD)
@@ -780,16 +785,11 @@ def parseMultiPE(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rm
             model = tf.keras.models.model_from_json(loaded_model_json)
             model.load_weights(modelName+'.h5')
             model = LiteModel.from_keras_model(model)
-            if "mixed" in modelName:
-                modelName = 1
-            else:
-                modelName = 0
         except:
             print("Could not load Tensorflow model :( Allo was written with Tensorflow version 2.11")
             sys.exit(0)
     else:
         model = None
-        modelName = None
 
     #Exception that causes errors
     if os.stat(tempFile+"MM").st_size == 0:
@@ -852,7 +852,7 @@ def parseMultiPE(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rm
             else:
                 if maxa is not None and len(rBlock) > maxa:
                     continue
-                readAssignPE(rBlock, rBlock2, AL, winSize, genLand, model, cnn_scores, rc, rmz, modelName, spliceD)
+                readAssignPE(rBlock, rBlock2, AL, winSize, genLand, model, cnn_scores, rc, rmz, spliceD)
                 numLoc[0] = (numLoc[0]*numLoc[1] + len(rBlock)) / (numLoc[1]+1)
                 numLoc[1] = numLoc[1] + 1
                 rBlock = []
@@ -864,7 +864,7 @@ def parseMultiPE(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rm
 
     #For last read
     if maxa is None or len(rBlock) <= maxa:
-        readAssignPE(rBlock, rBlock2, AL, winSize, genLand, model, cnn_scores, rc, rmz, modelName, spliceD)
+        readAssignPE(rBlock, rBlock2, AL, winSize, genLand, model, cnn_scores, rc, rmz, spliceD)
         numLoc[0] = (numLoc[0]*numLoc[1] + len(rBlock)) / (numLoc[1]+1)
         numLoc[1] = numLoc[1] + 1
 
@@ -915,3 +915,5 @@ class LiteModel:
         self.interpreter.invoke()
         out = self.interpreter.get_tensor(self.output_index)
         return out[0]
+
+

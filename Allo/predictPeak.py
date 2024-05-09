@@ -1,10 +1,8 @@
 #!/usr/bin/env python
 #Lexi Morrissey, Mahony Lab @ Pennsylvania State University
-#Last updated 04.22.2024
 #Contains method for predicting whether area should receive multimapped reads via pre-trained CNN in Allo.
 
 import os
-import numpy as np
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
 from tensorflow import keras
@@ -13,6 +11,7 @@ import os
 tf.config.run_functions_eagerly(False)
 import math
 import sys
+import numpy as np
 
 
 def predictNN(counts, winSize, model):
@@ -29,12 +28,12 @@ def predictNN(counts, winSize, model):
         if i == binTotal-1:
             binned.append(np.sum(counts[position:len(counts)]))
         else:
-            binned.append(np.sum(counts[position:position+5]))
+            binned.append(np.sum(counts[position:position+binSize]))
   
     binned = (99*(binned - np.min(binned))/np.ptp(binned)).astype(int) 
     for i in range(0,len(binned)):
         pic[binned[i],i] = 1
-        
+    pred = model.predict(pic.reshape(-1,100,100)) 
     try:
         #pred = model(pic.reshape(-1,100,100), training=False)
         pred = model.predict(pic.reshape(-1,100,100))

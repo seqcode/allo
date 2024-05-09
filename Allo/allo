@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 #Lexi Morrissey, Mahony Lab @ Pennsylvania State University
-#Last updated 03.06.2023
 #Main method for Allo. Splits the sam files up and sends them to allocation procedure via multiprocessing package.
 
 #Arguments
@@ -13,8 +12,9 @@ parser.add_argument('input')
 parser.add_argument('-seq', type=str, nargs=1, help='Single-end or paired-end sequencing mode', \
                    choices=['pe','se'], required=True, dest='seq')
 parser.add_argument('-o', type=str, nargs=1, help='Output file name', dest='outfile', default=None)
-parser.add_argument('--mixed', help='Use CNN trained on a dataset with mixed peaks, narrow by default', action='store_true', default=None)
-parser.add_argument('--rna', help='Use CNN trained on a RNAseq dataset', action='store_true', default=None)
+parser.add_argument('--mixed', help='Use CNN trained on a dataset with mixed ChIP-seq peaks, narrow by default', action='store_true', default=None)
+parser.add_argument('--dnase', help='Use CNN trained on a DNa-seq datasets', action='store_true', default=None)
+parser.add_argument('--atac', help='Use CNN trained on a ATAC-seq datasets', action='store_true', default=None)
 parser.add_argument('--splice', help='Remove splice sites based on cigar string when constructing image', action='store_true', default=None)
 parser.add_argument('-p', type=int, nargs=1, help='Number of processes, 1 by default', dest='processes', default=None)
 parser.add_argument('-max', type=int, nargs=1, help='Maximum value for number of locations a read can map', dest='maxlocations', default=None)
@@ -28,20 +28,21 @@ parser.add_argument('--parser', help='Ignore warnings about read sorting', actio
 args = parser.parse_args()
 
 #Imports
+import Allo
+from Allo import allocation
 import sys
 from joblib import Parallel, delayed
 import multiprocessing
 import subprocess
 import os
-from Allo import allocation
 import math
 from random import randint
-import shutil
 import glob
 import pysam
 import shutil
 import pkgutil
-import Allo
+
+
 
 
 #Function for concatenating files
@@ -50,11 +51,12 @@ def cat(files, outname):
         for f in files:
             with open(f,'rb') as fd:
                 shutil.copyfileobj(fd, wfd)
+            
 
 ##Main Method##          
 if __name__ == '__main__':
     
-    print("\nRunning Allo version 1.0\n\n")
+    print("\nRunning Allo version 1.1\n\n")
     
     #Make a folder to store all temp files in allo
     ids = str(randint(0, 10000))
@@ -86,9 +88,13 @@ if __name__ == '__main__':
         d = os.path.dirname(sys.modules["Allo"].__file__)
         m = os.path.join(d, "mixed")
         winSize = 500
-    elif args.rna is not None:
+    elif args.dnase is not None:
         d = os.path.dirname(sys.modules["Allo"].__file__)
-        m = os.path.join(d, "rna")
+        m = os.path.join(d, "dnase")
+        winSize = 500
+    elif args.atac is not None:
+        d = os.path.dirname(sys.modules["Allo"].__file__)
+        m = os.path.join(d, "atac")
         winSize = 500
     else:
         d = os.path.dirname(sys.modules["Allo"].__file__)
@@ -111,7 +117,7 @@ if __name__ == '__main__':
         rc = 2
     else:
         rc = 0
-        print("Using neural network...", flush=True)
+        print("Neural network mode on...", flush=True)
     #Keep unmapped reads
     if args.keep_unmap is not None:
         keep = 1

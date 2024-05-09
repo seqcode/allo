@@ -6,7 +6,7 @@ setup(
 	author='Alexis Morrissey',
 	author_email='anm5579@psu.edu',
 	packages=['Allo'],
-	python_requires='>=3.0',
+	python_requires='>=3.10',
 	scripts=['Allo/allo'],
 	url='https://github.com/seqcode/allo/archive/refs/tags/v1.1.0.tar.gz',
 	license='LICENSE.txt',

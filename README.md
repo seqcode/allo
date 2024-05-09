@@ -26,7 +26,7 @@ pip install -e .
 
 ## Usage
 ### Peak-based applications (ChIP-seq, ATAC-seq, DNase-seq, etc)
-#### Pre-processing
+#### Pre-processing and alignment
 Using Allo requires a few pre-processing steps. In most ChIP-seq, ATAC-seq, and DNase-seq pipelines, the default behavior of aligners is to assign multi-mapped reads to random locations within their mappings without retaining information on the other locations. Both Bowtie1/2 and BWA can be used for single-end. Unfortunately, BWA cannot be used for paired-end reads prior to Allo due to constraints in how it outputs multi-mapped reads. The following arguments should be used:
 
 *Bowtie1*
@@ -75,12 +75,14 @@ allo testRunPE.sam -seq pe
 #### Additional tips
 It is recommended to run Allo on both the control and target sequencing files in order to balance out background in the samples. We recommend running Allo using the --random argument on the control file. This generally results in higher confidence peaks.
 
-### Pre-processing for RNA-seq
+### RNA-seq application
+#### Pre-processing and alignment
 Allo is compatible with STAR alignments. We recommend using the "--outFilterType BySJout" argument if you choose to use the "--splice" function in Allo in order to only consider high quality junctions. An example of a paired-end STAR alignment keeping up to 25 locations per read is shown below:
 ```
 STAR --genomeDir GENOMEDIR --readFilesIn fASTQ_1 FASTQ_2 --outSAMtype BAM Unsorted --outSAMmultNmax 25 --outFilterType BySJout --outFileNamePrefix ALIGNEROUTPUT
 ```
 
+#### Running Allo
 To use Allo, first sort your file:
 ```
 samtools collate -o ALIGNEROUTPUT_SORT.BAM ALIGNEROUTPUT_FILTER.BAM

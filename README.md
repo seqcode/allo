@@ -1,9 +1,12 @@
 # Allo
 
-A multi-mapped read rescue strategy for peak-based gene regulatory analyses.
+A multi-mapped read rescue strategy for gene regulatory analyses.
+
+### Releases
+
+As of **v1.1.0**, Allo has neural networks trained for DNase-seq and ATAC-seq under the MACS2 parameters "--nomodel --shift -100 --extsize 200" for ATAC-seq and MACS2 default parameters for DNase-seq. Additionally, Allo now has the option to remove introns as identified by splice junction information in the CIGAR string of an aligned read. This affects the window used to sum uniquely mapped reads. Information below regarding the use of Allo for RNA-seq data processing.
 
 ## Installation
-
 ### Package managers
 
 *  Bioconda: [![Anaconda-Server Badge](https://anaconda.org/bioconda/allo/badges/version.svg)](https://anaconda.org/bioconda/allo)
@@ -22,23 +25,24 @@ pip install -e .
 ```
 
 ## Usage
-### Pre-processing
-Using Allo requires a few pre-processing steps. In most ChIP pipelines, the default behavior of aligners is to assign multi-mapped reads to random locations within their mappings without retaining information on the other locations. Both Bowtie1/2 and BWA can be used for single-end. Unfortunately, BWA cannot be used for paired-end reads prior to Allo due to constraints in how it outputs multi-mapped reads. The following arguments should be used:
+### Peak-based applications (ChIP-seq, ATAC-seq, DNase-seq, etc)
+#### Pre-processing
+Using Allo requires a few pre-processing steps. In most ChIP-seq, ATAC-seq, and DNase-seq pipelines, the default behavior of aligners is to assign multi-mapped reads to random locations within their mappings without retaining information on the other locations. Both Bowtie1/2 and BWA can be used for single-end. Unfortunately, BWA cannot be used for paired-end reads prior to Allo due to constraints in how it outputs multi-mapped reads. The following arguments should be used:
 
 *Bowtie1*
 
 ```
 #Single-end
-bowtie -x INDEX -q FASTQ -S SAMOUT --best --strata -m 50 -k 50 -p THREADS
+bowtie -x INDEX -q FASTQ -S SAMOUT --best --strata -m 25 -k 25 -p THREADS
 #Paired-end
-bowtie -x INDEX -1 READ1 -2 READ2 -S SAMOUT --best --strata -m 50 -k 50 -p THREADS
+bowtie -x INDEX -1 READ1 -2 READ2 -S SAMOUT --best --strata -m 25 -k 25 -p THREADS
 ```
 *Bowtie2*
 ```
 #Single-end
-bowtie2 -x INDEX -q FASTQ -S SAMOUT -k 50 -p THREADS
+bowtie2 -x INDEX -q FASTQ -S SAMOUT -k 25 -p THREADS
 #Paired-end
-bowtie2 -x INDEX -1 READ1 -2 READ2 -S SAMOUT -k 50 --no-mixed --no-discordant -p THREADS
+bowtie2 -x INDEX -1 READ1 -2 READ2 -S SAMOUT -k 25 --no-mixed --no-discordant -p THREADS
 ```
 *BWA*
 ```
@@ -53,7 +57,7 @@ Finally, the output of the aligners must be sorted by read name in order to use 
 samtools collate -o ALIGNEROUTPUT_SORT.SAM ALIGNEROUTPUT_FILTER.SAM
 ```
 
-### Running Allo
+#### Running Allo
 The basic command for Allo:
 ```
 allo ALIGNEROUTPUT_SORT.SAM -seq PAIRED_OR_SINGLE -o OUTPUTNAME -m MIXED_OR_NARROW_PEAKS
@@ -68,18 +72,44 @@ Very short test files are supplied to make sure Allo runs to completion on your 
 allo testRunPE.sam -seq pe
 ```
 
-### Post-processing and tips
+#### Additional tips
+It is recommended to run Allo on both the control and target sequencing files in order to balance out background in the samples. We recommend running Allo using the --random argument on the control file. This generally results in higher confidence peaks.
+
+### Pre-processing for RNA-seq
+Allo is compatible with STAR alignments. We recommend using the "--outFilterType BySJout" argument if you choose to use the "--splice" function in Allo in order to only consider high quality junctions. An example of a paired-end STAR alignment keeping up to 25 locations per read is shown below:
+```
+STAR --genomeDir GENOMEDIR --readFilesIn fASTQ_1 FASTQ_2 --outSAMtype BAM Unsorted --outSAMmultNmax 25 --outFilterType BySJout --outFileNamePrefix ALIGNEROUTPUT
+```
+
+To use Allo, first sort your file:
+```
+samtools collate -o ALIGNEROUTPUT_SORT.BAM ALIGNEROUTPUT_FILTER.BAM
+```
+
+Following this, we recommend running Allo on read count only mode as the neural networks available are not trained on RNA-seq profiles. Additionally, the --splice argument can be used if the user would like Allo to splice introns out when summing uniquely mapped reads.
+```
+allo ALIGNEROUTPUT_SORT.BAM -seq PAIRED_OR_SINGLE -o OUTPUTNAME --readcount --splice
+```
+
+#### Downstream analysis
+Following the use of Allo, users can utilize FeatureCounts with the argument "-M" which retains multi-mapped reads.
+```
+featureCounts -a GTF_FILE -o COUNTS.out *.bam -M
+```
+
+
+## Output information
 Allo adds a ZA tag to every MMR that is allocated. For reads that are allocated to regions that all contain 0 UMRs (random assignment), a ZZ tag is used instead. This allows users to remove reads that only map to zero UMR regions if they wish. The value within either tag corresponds to the number of places a read/pair mapped to. In order to get only uniquely mapped reads, grep could be used with the -v option to exclude lines with ZA or ZZ tags. On the same note, awk can used to filter reads with a specific number of mapping locations (can also be done with the -max option within Allo). Outside of adding these tags, Allo does not change anything within the read alignment columns for allocated reads.
-
-Tip: It is recommended to run Allo on both the control and target sequencing files in order to balance out background in the samples. We recommend running Allo using the --random argument on the control file. This generally results in higher confidence peaks.
-
 
 ### Options
 | Argument  | Options | Explanation |
 | ------------- | ------------- | ------------- |
 | -o  | any string | Output file name  |
 | -seq | "se" "pe" | Single-end or paired-end sequencing mode, REQUIRED | 
-| -m  | "mixed" "narrow" | Use CNN trained on either a narrow peak dataset or a dataset with mixed peaks, narrow by default |
+| --mixed | | Use CNN trained on histone ChIP-seq datasets with mixed peaks, narrow by default |
+| --dnase | | Use CNN trained on histone DNase-seq datasets, narrow by default |
+| --atac | | Use CNN trained on histone ATAC-seq datasets, narrow by default |
+| --splice | | Remove introns as identified by splice junctions when summing the uniquely-mapped read counts |
 | -p  | any int | Number of processes, 1 by default |
 | --keep-unmap |  | Keep unmapped reads and reads that include N in their sequence | 
 | --remove-zeros |  | Do not report multi-mapped reads that map to regions with 0 uniquely mapped reads (random assignment) |

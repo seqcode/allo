@@ -2,7 +2,9 @@
 
 A multi-mapped read rescue strategy for gene regulatory analyses.
 
-[Check out our pre-print to learn more!](https://www.biorxiv.org/content/10.1101/2023.09.12.556916v1)
+**Genome Research paper now online:** [https://genome.cshlp.org/content/early/2024/07/10/gr.278638.123.abstract](https://genome.cshlp.org/content/early/2024/07/10/gr.278638.123.abstract)
+
+[Or check out our pre-print to learn more!](https://www.biorxiv.org/content/10.1101/2023.09.12.556916v1)
 
 ### Releases
 

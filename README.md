@@ -2,7 +2,9 @@
 
 A multi-mapped read rescue strategy for gene regulatory analyses.
 
-[Check out our pre-print to learn more!](https://www.biorxiv.org/content/10.1101/2023.09.12.556916v1)
+**Genome Research paper now online:** [https://genome.cshlp.org/content/early/2024/07/10/gr.278638.123.abstract](https://genome.cshlp.org/content/early/2024/07/10/gr.278638.123.abstract)
+
+[Or check out our pre-print to learn more!](https://www.biorxiv.org/content/10.1101/2023.09.12.556916v1)
 
 ### Releases
 
@@ -11,11 +13,11 @@ As of **v1.1.0**, Allo has neural networks trained for DNase-seq and ATAC-seq un
 ## Installation
 ### Package managers
 
-*  Bioconda: [![Anaconda-Server Badge](https://anaconda.org/bioconda/allo/badges/version.svg)](https://anaconda.org/bioconda/allo)
-[![Anaconda-Server Badge](https://anaconda.org/bioconda/allo/badges/downloads.svg)](https://anaconda.org/bioconda/allo)
+*  Bioconda: [![Anaconda-Server Badge](https://anaconda.org/bioconda/allo/badges/version.svg?v=3)](https://anaconda.org/bioconda/allo)
+[![Anaconda-Server Badge](https://anaconda.org/bioconda/allo/badges/downloads.svg?v=3)](https://anaconda.org/bioconda/allo)
 
 
-*  PyPI: [![PyPI version](https://badge.fury.io/py/bio-allo.svg)](https://badge.fury.io/py/bio-allo)
+*  PyPI: [![PyPI version](https://badge.fury.io/py/bio-allo.svg?v=2)](https://badge.fury.io/py/bio-allo)
 
 
 ### Git clone and pip

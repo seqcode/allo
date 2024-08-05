@@ -4,16 +4,18 @@
 
 #Arguments
 import argparse
-parser = argparse.ArgumentParser(prog = 'Allo', \
-                    description = 'Allo is a software that allocates multi-mapped reads in ChIP-seq data\n' \
-                    'Developed by Alexis Morrissey, Mahony Laboratory @ The Pennsylvania State University', \
+version = "1.1.2"
+parser = argparse.ArgumentParser(prog = 'allo', \
+                    description = '(Version ' + version + ') Allo is a software that allocates multi-mapped reads in gene regulatory data.\n' \
+                    'Developed by Mahony Laboratory @ The Pennsylvania State University', \
                     epilog= 'For more pre-processing info and basic usage, please visit https://github.com/seqcode/allo')
+parser.add_argument('-v', '--version', action='version', version=version)
 parser.add_argument('input')
 parser.add_argument('-seq', type=str, nargs=1, help='Single-end or paired-end sequencing mode', \
-                   choices=['pe','se'], required=True, dest='seq')
+                   choices=['pe','se'], dest='seq', required=True)
 parser.add_argument('-o', type=str, nargs=1, help='Output file name', dest='outfile', default=None)
 parser.add_argument('--mixed', help='Use CNN trained on a dataset with mixed ChIP-seq peaks, narrow by default', action='store_true', default=None)
-parser.add_argument('--dnase', help='Use CNN trained on a DNa-seq datasets', action='store_true', default=None)
+parser.add_argument('--dnase', help='Use CNN trained on a DNase-seq datasets', action='store_true', default=None)
 parser.add_argument('--atac', help='Use CNN trained on a ATAC-seq datasets', action='store_true', default=None)
 parser.add_argument('--splice', help='Remove splice sites based on cigar string when constructing image', action='store_true', default=None)
 parser.add_argument('-p', type=int, nargs=1, help='Number of processes, 1 by default', dest='processes', default=None)
@@ -24,7 +26,7 @@ parser.add_argument('--r2', help='Use read 2 for allocation procedure instead of
 parser.add_argument('--readcount', help='CNN will not be used in allocation, only read counts', action='store_true', default=None)
 parser.add_argument('--random', help='Reads will be randomly assigned (similar to Bowtie and BWA on default)', action='store_true', default=None)
 parser.add_argument('--ignore', help='Ignore warnings about read sorting', action='store_true', default=None)
-parser.add_argument('--parser', help='Ignore warnings about read sorting', action='store_true', default=None)
+parser.add_argument('--parser', help='Parse alignment files to extract uniquely and multi-mapped reads', action='store_true', default=None)
 args = parser.parse_args()
 
 #Imports
@@ -56,7 +58,8 @@ def cat(files, outname):
 ##Main Method##          
 if __name__ == '__main__':
     
-    print("\nRunning Allo version 1.1\n\n")
+    print("\nRunning Allo version " + version + "\n\n")
+
     
     #Make a folder to store all temp files in allo
     ids = str(randint(0, 10000))
@@ -110,6 +113,9 @@ if __name__ == '__main__':
         seq = 1
     elif args.seq[0] == "pe":
         seq = 0
+    else:
+        print("Unknown or missing sequencing type: " + seq)
+        sys.exit(0)
     #Options for probabilities
     if args.readcount is not None:
         rc = 1

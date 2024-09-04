@@ -4,7 +4,7 @@
 
 #Arguments
 import argparse
-version = "1.1.2"
+version = "1.2.0"
 parser = argparse.ArgumentParser(prog = 'allo', \
                     description = '(Version ' + version + ') Allo is a software that allocates multi-mapped reads in gene regulatory data.\n' \
                     'Developed by Mahony Laboratory @ The Pennsylvania State University', \

@@ -6,6 +6,8 @@ from Allo import predictPeak
 import math
 import random
 import os
+import contextlib, io
+import logging
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
 from tensorflow import keras
@@ -16,9 +18,9 @@ import numpy as np
 import sys
 import multiprocessing
 import re
-import absl.logging
-absl.logging.set_verbosity(absl.logging.ERROR)
-import contextlib, io
+from contextlib import contextmanager
+from absl import logging
+import warnings
 
 #Add reads to UMR dictionary
 def addToDict(tempFile, genLand, spliceD, seq):
@@ -381,14 +383,15 @@ def parseMulti(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rmz,
     #Getting trained CNN
     if rc == 0:
         try:
-            json_file = open(modelName+'.json', 'r')
-            loaded_model_json = json_file.read()
-            json_file.close()
-            model = tf.keras.models.model_from_json(loaded_model_json)
-            model.load_weights(modelName+'.h5')
-            model = LiteModel.from_keras_model(model)
+            with suppress_output():
+                json_file = open(modelName+'.json', 'r')
+                loaded_model_json = json_file.read()
+                json_file.close()
+                model = tf.keras.models.model_from_json(loaded_model_json)
+                model.load_weights(modelName+'.weights.h5')
+                model = LiteModel.from_keras_model(model)
         except:
-            print("Could not load Tensorflow model :( Allo was written with Tensorflow version 2.11")
+            print("Could not load Tensorflow model :( This version of Allo was written with Tensorflow version 2.17")
             sys.exit(0)
     else:
         model = None
@@ -779,14 +782,15 @@ def parseMultiPE(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rm
     #Getting trained CNN and making sure there is a compatible tensorflow installed
     if rc == 0:
         try:
-            json_file = open(modelName+'.json', 'r')
-            loaded_model_json = json_file.read()
-            json_file.close()
-            model = tf.keras.models.model_from_json(loaded_model_json)
-            model.load_weights(modelName+'.h5')
-            model = LiteModel.from_keras_model(model)
+            with suppress_output():
+                json_file = open(modelName+'.json', 'r')
+                loaded_model_json = json_file.read()
+                json_file.close()
+                model = tf.keras.models.model_from_json(loaded_model_json)
+                model.load_weights(modelName+'.weights.h5')
+                model = LiteModel.from_keras_model(model)
         except:
-            print("Could not load Tensorflow model :( Allo was written with Tensorflow version 2.11")
+            print("Could not load Tensorflow model :( This version of Allo was written with Tensorflow version 2.17")
             sys.exit(0)
     else:
         model = None
@@ -888,6 +892,9 @@ class LiteModel:
         return LiteModel(tf.lite.Interpreter(model_content=tflite_model))
     
     def __init__(self, interpreter):
+        logging.set_verbosity(logging.ERROR)
+        warnings.filterwarnings('ignore')
+        tf.get_logger().setLevel('ERROR')
         self.interpreter = interpreter
         self.interpreter.allocate_tensors()
         input_det = self.interpreter.get_input_details()[0]
@@ -916,4 +923,19 @@ class LiteModel:
         out = self.interpreter.get_tensor(self.output_index)
         return out[0]
 
+#Supressing output from tensorflow
+@contextmanager
+def suppress_output():
+    with open(os.devnull, 'w') as devnull:
+        old_stdout_fd = os.dup(sys.stdout.fileno())
+        old_stderr_fd = os.dup(sys.stderr.fileno())
 
+        try:
+            os.dup2(devnull.fileno(), sys.stdout.fileno())
+            os.dup2(devnull.fileno(), sys.stderr.fileno())
+            yield
+        finally:
+            os.dup2(old_stdout_fd, sys.stdout.fileno())
+            os.dup2(old_stderr_fd, sys.stderr.fileno())
+            os.close(old_stdout_fd)
+            os.close(old_stderr_fd)

@@ -3,8 +3,13 @@
 #Contains method for predicting whether area should receive multimapped reads via pre-trained CNN in Allo.
 
 import os
+import absl.logging
+absl.logging.set_verbosity(absl.logging.ERROR)
+import contextlib, io
+import logging
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
+tf.get_logger().setLevel(logging.ERROR)
 from tensorflow import keras
 from tensorflow.keras.models import load_model, Model
 import os
@@ -12,7 +17,6 @@ tf.config.run_functions_eagerly(False)
 import math
 import sys
 import numpy as np
-
 
 def predictNN(counts, winSize, model):
     pic = np.zeros((100, 100), float)
@@ -33,7 +37,6 @@ def predictNN(counts, winSize, model):
     binned = (99*(binned - np.min(binned))/np.ptp(binned)).astype(int) 
     for i in range(0,len(binned)):
         pic[binned[i],i] = 1
-    pred = model.predict(pic.reshape(-1,100,100)) 
     try:
         #pred = model(pic.reshape(-1,100,100), training=False)
         pred = model.predict(pic.reshape(-1,100,100))
@@ -41,5 +44,5 @@ def predictNN(counts, winSize, model):
         return pred[0][0]
 
     except:
-        print("Could not predict with Tensorflow model :( Allo was written with Tensorflow version 2.11", flush=True)
+        print("Could not predict with Tensorflow model :( This version of Allo was written with Tensorflow version 2.17", flush=True)
         sys.exit(0)

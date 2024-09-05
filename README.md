@@ -8,7 +8,7 @@ A multi-mapped read rescue strategy for gene regulatory analyses.
 ### Releases
 **v1.2.0**
 
-the CNNs were retrained using Tensorflow 2.17 to allow for compatibility with pip installations.
+The CNNs were retrained using Tensorflow 2.17 to allow for compatibility with pip installations.
 
 **v1.1.0**
 
@@ -17,11 +17,11 @@ Allo has neural networks trained for DNase-seq and ATAC-seq under the MACS2 para
 ## Installation
 ### Package managers
 
-*  Bioconda: [![Anaconda-Server Badge](https://anaconda.org/bioconda/allo/badges/version.svg?v=3)](https://anaconda.org/bioconda/allo)
-[![Anaconda-Server Badge](https://anaconda.org/bioconda/allo/badges/downloads.svg?v=3)](https://anaconda.org/bioconda/allo)
+*  Bioconda: [![Anaconda-Server Badge](https://anaconda.org/bioconda/allo/badges/version.svg?v=4)](https://anaconda.org/bioconda/allo)
+[![Anaconda-Server Badge](https://anaconda.org/bioconda/allo/badges/downloads.svg?v=4)](https://anaconda.org/bioconda/allo)
 
 
-*  PyPI: [![PyPI version](https://badge.fury.io/py/bio-allo.svg?v=2)](https://badge.fury.io/py/bio-allo)
+*  PyPI: [![PyPI version](https://badge.fury.io/py/bio-allo.svg?v=3)](https://badge.fury.io/py/bio-allo)
 
 
 ### Git clone and pip

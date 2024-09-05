@@ -4,9 +4,9 @@ A multi-mapped read rescue strategy for gene regulatory analyses.
 
 **Genome Research paper now online:** [https://genome.cshlp.org/content/early/2024/07/10/gr.278638.123.abstract](https://genome.cshlp.org/content/early/2024/07/10/gr.278638.123.abstract)
 
-[Or check out our pre-print to learn more!](https://www.biorxiv.org/content/10.1101/2023.09.12.556916v1)
 
 ### Releases
+As of **v1.2.0**, the CNNs were retrained using Tensorflow 2.17 to allow for compatibility with pip installations.
 
 As of **v1.1.0**, Allo has neural networks trained for DNase-seq and ATAC-seq under the MACS2 parameters "--nomodel --shift -100 --extsize 200" for ATAC-seq and MACS2 default parameters for DNase-seq. Additionally, Allo now has the option to remove introns as identified by splice junction information in the CIGAR string of an aligned read. This affects the window used to sum uniquely mapped reads. Information below regarding the use of Allo for RNA-seq data processing.
 

@@ -127,7 +127,6 @@ Allo adds a ZA tag to every MMR that is allocated. For reads that are allocated 
 | --r2 |  | Use read 2 for allocation procedure instead of read 1 (only for paired-end sequencing) |
 | --readcount |  | CNN will not be used in allocation, only read counts |
 | --random |  | Reads will be randomly assigned (similar to Bowtie and BWA by default) |
-| -s  | any int | Seed for random number generator to keep consistency, 7 by default |
 | --ignore |  | Ignore warning about read sorting |
 | --parser |  | Allo utility that produces separate files for unique and multi-mapped reads from a SAM or BAM file. Bowtie2 and BWA will output all alignments that meet the given threshold even if one alignment has the highest score. |
 

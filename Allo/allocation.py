@@ -4,8 +4,8 @@
 
 from Allo import predictPeak
 import math
-import random
 import os
+import zlib
 import contextlib, io
 import logging
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -145,8 +145,6 @@ def getArray(read, winSize, genLand, spliceD):
 
 #Assign reads (straight to dictionary for uniq and actual assign for multi-mapped)
 def readAssign(rBlock, samOut, winSize, genLand, model, cnn_scores, rc, rmz, spliceD):
-    random.seed(7)      #To make results reproducible
-
     ##Multi-mapped reads##
     ###CNN###
     scores_rc = []
@@ -202,8 +200,10 @@ def readAssign(rBlock, samOut, winSize, genLand, model, cnn_scores, rc, rmz, spl
         percs = scores_rc / np.sum(scores_rc)
 
     #Picking read to allocate based on percentages
-    np.random.seed(7)
-    choice = np.random.choice(range(0,len(rBlock)), p=percs, replace=True, size=1)[0]
+    #Seeded per read block from the read name, so the draw is a genuine sample from
+    #percs while staying reproducible across runs, thread counts and file chunking.
+    rng = np.random.default_rng(zlib.crc32(rBlock[0][0].encode()))
+    choice = rng.choice(len(rBlock), p=percs)
     
     #Adding to file
     rBlock[choice][-1] = rBlock[choice][-1].strip()
@@ -704,7 +704,6 @@ def parseUniqPE(tempFile, winSize, cnn_scores, AS, rc, keep, r2):
 
 #Assign reads (straight to dictionary for uniq and actual assign for multi-mapped)
 def readAssignPE(rBlock, rBlock2, samOut, winSize, genLand, model, cnn_scores, rc, rmz, spliceD):
-    random.seed(7)      #To make results reproducible
     ##Multi-mapped reads##
     ###CNN###
     scores_rc = []
@@ -760,8 +759,10 @@ def readAssignPE(rBlock, rBlock2, samOut, winSize, genLand, model, cnn_scores, r
         percs = scores_rc / np.sum(scores_rc)
 
     #Picking read to allocate based on percentages
-    np.random.seed(7)
-    choice = np.random.choice(range(0,len(rBlock)), p=percs, replace=True, size=1)[0]
+    #Seeded per read block from the read name, so the draw is a genuine sample from
+    #percs while staying reproducible across runs, thread counts and file chunking.
+    rng = np.random.default_rng(zlib.crc32(rBlock[0][0].encode()))
+    choice = rng.choice(len(rBlock), p=percs)
     
     #Adding to file
     rBlock[choice][-1] = rBlock[choice][-1].strip()

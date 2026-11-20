@@ -74,7 +74,8 @@ if __name__ == '__main__':
     except:
         print("SAM/BAM file not given or PySam does not recognize format of file.")
     #Convert from bam to sam if necessary
-    if not ".sam" in samfile and not ".SAM" in samfile:
+    #Test the file's actual extension; a substring search matches paths like my.sample.bam
+    if not os.path.splitext(samfile)[1].lower() == ".sam":
         pysam.set_verbosity(0) #Pysam outputs a warning about indexing
         infile = pysam.AlignmentFile(samfile, "rb")
         outfile = pysam.AlignmentFile(allo_dir+"/"+ids+".sam", "w", template=infile)
@@ -115,7 +116,7 @@ if __name__ == '__main__':
         seq = 0
     else:
         print("Unknown or missing sequencing type: " + seq)
-        sys.exit(0)
+        sys.exit(1)
     #Options for probabilities
     if args.readcount is not None:
         rc = 1
@@ -176,7 +177,7 @@ if __name__ == '__main__':
     if collate == 0 and ig == 0:
         print("Warning: PG tag with collate not present in header. File does not appear to be sorted.")
         print("Please use Samtools collate before running Allo. To ignore this warning use argument --ignore")
-        sys.exit(0)
+        sys.exit(1)
 
     
     #Need list of file names

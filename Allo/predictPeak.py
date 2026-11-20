@@ -51,4 +51,4 @@ def predictNN(counts, winSize, model):
 
     except:
         print("Could not predict with Tensorflow model :( This version of Allo was written with Tensorflow version 2.17", flush=True)
-        sys.exit(0)
+        sys.exit(1)

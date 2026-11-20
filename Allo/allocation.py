@@ -193,7 +193,7 @@ def readAssign(rBlock, samOut, winSize, genLand, model, cnn_scores, rc, rmz, spl
         print("Score list length does not match the number of alignments")
         print(scores_nn)
         print(scores_rc, flush=True)
-        sys.exit(0)
+        sys.exit(1)
     total = np.sum(scores)
     if total > 0:
         percs = np.asarray(scores, dtype=float) / total
@@ -394,7 +394,7 @@ def parseMulti(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rmz,
                 model = LiteModel.from_keras_model(model)
         except:
             print("Could not load Tensorflow model :( This version of Allo was written with Tensorflow version 2.17")
-            sys.exit(0)
+            sys.exit(1)
     else:
         model = None
     #Exception that causes errors
@@ -754,7 +754,7 @@ def readAssignPE(rBlock, rBlock2, samOut, winSize, genLand, model, cnn_scores, r
         print("Score list length does not match the number of alignments")
         print(scores_nn)
         print(scores_rc, flush=True)
-        sys.exit(0)
+        sys.exit(1)
     total = np.sum(scores)
     if total > 0:
         percs = np.asarray(scores, dtype=float) / total
@@ -796,7 +796,7 @@ def parseMultiPE(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rm
                 model = LiteModel.from_keras_model(model)
         except:
             print("Could not load Tensorflow model :( This version of Allo was written with Tensorflow version 2.17")
-            sys.exit(0)
+            sys.exit(1)
     else:
         model = None
 
@@ -856,7 +856,7 @@ def parseMultiPE(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rm
                         #Error if not sorted properly
                         print("Pairs not sorted properly. Issue with following entry.")
                         print(r[0])
-                        sys.exit(0)
+                        sys.exit(1)
             #If different read, begin read assignment
             else:
                 if maxa is not None and len(rBlock) > maxa:

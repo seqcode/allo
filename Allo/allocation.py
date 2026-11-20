@@ -4,8 +4,8 @@
 
 from Allo import predictPeak
 import math
-import random
 import os
+import zlib
 import contextlib, io
 import logging
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -145,8 +145,9 @@ def getArray(read, winSize, genLand, spliceD):
 
 #Assign reads (straight to dictionary for uniq and actual assign for multi-mapped)
 def readAssign(rBlock, samOut, winSize, genLand, model, cnn_scores, rc, rmz, spliceD):
-    random.seed(7)      #To make results reproducible
-
+    #Nothing survived filtering, so there is nothing to allocate
+    if len(rBlock) == 0:
+        return
     ##Multi-mapped reads##
     ###CNN###
     scores_rc = []
@@ -158,7 +159,7 @@ def readAssign(rBlock, samOut, winSize, genLand, model, cnn_scores, rc, rmz, spl
             pos = i[2]+";"+str(i[3])
         else:
             pos = i[2]+";"+str(round(int(i[3])/100)*100)
-        if pos in cnn_scores:
+        if rc == 0 and pos in cnn_scores:
             scores_nn.append(cnn_scores[pos])
             allZ = False
         else:
@@ -190,20 +191,24 @@ def readAssign(rBlock, samOut, winSize, genLand, model, cnn_scores, rc, rmz, spl
         
     ##Choosing which read to keep based on probabilities from nearby read counts
     #List clean up
-    if len(scores_nn)>0:
-        try:
-            percs = scores_nn / np.sum(scores_nn)
-        except:
-            print("Issue with array")
-            print(scores_nn)
-            print(scores_rc, flush=True)
-            sys.exit(0)
+    scores = scores_nn if len(scores_nn) > 0 else scores_rc
+    if not len(scores) == len(rBlock):
+        print("Score list length does not match the number of alignments")
+        print(scores_nn)
+        print(scores_rc, flush=True)
+        sys.exit(1)
+    total = np.sum(scores)
+    if total > 0:
+        percs = np.asarray(scores, dtype=float) / total
     else:
-        percs = scores_rc / np.sum(scores_rc)
+        #Every location scored zero, so there is nothing to prefer between them
+        percs = np.full(len(scores), 1.0/len(scores))
 
     #Picking read to allocate based on percentages
-    np.random.seed(7)
-    choice = np.random.choice(range(0,len(rBlock)), p=percs, replace=True, size=1)[0]
+    #Seeded per read block from the read name, so the draw is a genuine sample from
+    #percs while staying reproducible across runs, thread counts and file chunking.
+    rng = np.random.default_rng(zlib.crc32(rBlock[0][0].encode()))
+    choice = rng.choice(len(rBlock), p=percs)
     
     #Adding to file
     rBlock[choice][-1] = rBlock[choice][-1].strip()
@@ -392,7 +397,7 @@ def parseMulti(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rmz,
                 model = LiteModel.from_keras_model(model)
         except:
             print("Could not load Tensorflow model :( This version of Allo was written with Tensorflow version 2.17")
-            sys.exit(0)
+            sys.exit(1)
     else:
         model = None
     #Exception that causes errors
@@ -704,7 +709,9 @@ def parseUniqPE(tempFile, winSize, cnn_scores, AS, rc, keep, r2):
 
 #Assign reads (straight to dictionary for uniq and actual assign for multi-mapped)
 def readAssignPE(rBlock, rBlock2, samOut, winSize, genLand, model, cnn_scores, rc, rmz, spliceD):
-    random.seed(7)      #To make results reproducible
+    #Nothing survived filtering, so there is nothing to allocate
+    if len(rBlock) == 0 or len(rBlock2) == 0:
+        return
     ##Multi-mapped reads##
     ###CNN###
     scores_rc = []
@@ -716,7 +723,7 @@ def readAssignPE(rBlock, rBlock2, samOut, winSize, genLand, model, cnn_scores, r
             pos = i[2]+";"+str(i[3])
         else:
             pos = i[2]+";"+str(round(int(i[3])/100)*100)
-        if pos in cnn_scores:
+        if rc == 0 and pos in cnn_scores:
             scores_nn.append(cnn_scores[pos])
             allZ = False
         else:
@@ -748,20 +755,24 @@ def readAssignPE(rBlock, rBlock2, samOut, winSize, genLand, model, cnn_scores, r
         
     ##Choosing which read to keep based on probabilities from nearby read counts
     #List clean up
-    if len(scores_nn)>0:
-        try:
-            percs = scores_nn / np.sum(scores_nn)
-        except:
-            print("Issue with array")
-            print(scores_nn)
-            print(scores_rc, flush=True)
-            sys.exit(0)
+    scores = scores_nn if len(scores_nn) > 0 else scores_rc
+    if not len(scores) == len(rBlock):
+        print("Score list length does not match the number of alignments")
+        print(scores_nn)
+        print(scores_rc, flush=True)
+        sys.exit(1)
+    total = np.sum(scores)
+    if total > 0:
+        percs = np.asarray(scores, dtype=float) / total
     else:
-        percs = scores_rc / np.sum(scores_rc)
+        #Every location scored zero, so there is nothing to prefer between them
+        percs = np.full(len(scores), 1.0/len(scores))
 
     #Picking read to allocate based on percentages
-    np.random.seed(7)
-    choice = np.random.choice(range(0,len(rBlock)), p=percs, replace=True, size=1)[0]
+    #Seeded per read block from the read name, so the draw is a genuine sample from
+    #percs while staying reproducible across runs, thread counts and file chunking.
+    rng = np.random.default_rng(zlib.crc32(rBlock[0][0].encode()))
+    choice = rng.choice(len(rBlock), p=percs)
     
     #Adding to file
     rBlock[choice][-1] = rBlock[choice][-1].strip()
@@ -791,7 +802,7 @@ def parseMultiPE(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rm
                 model = LiteModel.from_keras_model(model)
         except:
             print("Could not load Tensorflow model :( This version of Allo was written with Tensorflow version 2.17")
-            sys.exit(0)
+            sys.exit(1)
     else:
         model = None
 
@@ -827,6 +838,12 @@ def parseMultiPE(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rm
            #Just adding to arrays if it's the same read
             if curRead == r[0]:
                 if numR == 1 and numL == 1:
+                    #Drop the pair if either mate is filtered out
+                    if keep == 0 and (r[2] == "*" or "N" in r[9] or \
+                                      rBlock[-1][2] == "*" or "N" in rBlock[-1][9]):
+                        rBlock.pop()
+                        numL = numL + 1
+                        continue
                     rBlock2.append(r)
                     numL = numL + 1
                     continue
@@ -834,11 +851,13 @@ def parseMultiPE(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rm
                     rBlock.append(r)
                     numL = numL + 1  
                 else:
-                    #Exceptions that cause errors
+                    #Drop the pair if either mate is filtered out. Only R1 of this pair
+                    #has been added so far, so that is all there is to take back off.
                     if keep == 0:
-                        if r[2] == "*" or "N" in r[9]:
+                        if r[2] == "*" or "N" in r[9] or rBlock[-1][2] == "*" or "N" in rBlock[-1][9]:
                             rBlock.pop()
-                            rBlock2.pop()
+                            numL = numL + 1
+                            continue
                     #Making sure pairs are correctly together
                     r2chr = rBlock[-1][6]
                     if r2chr == "=":
@@ -851,10 +870,18 @@ def parseMultiPE(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rm
                         #Error if not sorted properly
                         print("Pairs not sorted properly. Issue with following entry.")
                         print(r[0])
-                        sys.exit(0)
+                        sys.exit(1)
             #If different read, begin read assignment
             else:
                 if maxa is not None and len(rBlock) > maxa:
+                    #Skip this block, but start the next read, or every later read in
+                    #this chunk keeps hitting this branch against a block never cleared
+                    rBlock = []
+                    rBlock2 = []
+                    rBlock.append(r)
+                    curRead = r[0]
+                    numR = numR + 1
+                    numL = 1
                     continue
                 readAssignPE(rBlock, rBlock2, AL, winSize, genLand, model, cnn_scores, rc, rmz, spliceD)
                 numLoc[0] = (numLoc[0]*numLoc[1] + len(rBlock)) / (numLoc[1]+1)

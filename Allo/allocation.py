@@ -156,7 +156,7 @@ def readAssign(rBlock, samOut, winSize, genLand, model, cnn_scores, rc, rmz, spl
             pos = i[2]+";"+str(i[3])
         else:
             pos = i[2]+";"+str(round(int(i[3])/100)*100)
-        if pos in cnn_scores:
+        if rc == 0 and pos in cnn_scores:
             scores_nn.append(cnn_scores[pos])
             allZ = False
         else:
@@ -188,16 +188,18 @@ def readAssign(rBlock, samOut, winSize, genLand, model, cnn_scores, rc, rmz, spl
         
     ##Choosing which read to keep based on probabilities from nearby read counts
     #List clean up
-    if len(scores_nn)>0:
-        try:
-            percs = scores_nn / np.sum(scores_nn)
-        except:
-            print("Issue with array")
-            print(scores_nn)
-            print(scores_rc, flush=True)
-            sys.exit(0)
+    scores = scores_nn if len(scores_nn) > 0 else scores_rc
+    if not len(scores) == len(rBlock):
+        print("Score list length does not match the number of alignments")
+        print(scores_nn)
+        print(scores_rc, flush=True)
+        sys.exit(0)
+    total = np.sum(scores)
+    if total > 0:
+        percs = np.asarray(scores, dtype=float) / total
     else:
-        percs = scores_rc / np.sum(scores_rc)
+        #Every location scored zero, so there is nothing to prefer between them
+        percs = np.full(len(scores), 1.0/len(scores))
 
     #Picking read to allocate based on percentages
     #Seeded per read block from the read name, so the draw is a genuine sample from
@@ -715,7 +717,7 @@ def readAssignPE(rBlock, rBlock2, samOut, winSize, genLand, model, cnn_scores, r
             pos = i[2]+";"+str(i[3])
         else:
             pos = i[2]+";"+str(round(int(i[3])/100)*100)
-        if pos in cnn_scores:
+        if rc == 0 and pos in cnn_scores:
             scores_nn.append(cnn_scores[pos])
             allZ = False
         else:
@@ -747,16 +749,18 @@ def readAssignPE(rBlock, rBlock2, samOut, winSize, genLand, model, cnn_scores, r
         
     ##Choosing which read to keep based on probabilities from nearby read counts
     #List clean up
-    if len(scores_nn)>0:
-        try:
-            percs = scores_nn / np.sum(scores_nn)
-        except:
-            print("Issue with array")
-            print(scores_nn)
-            print(scores_rc, flush=True)
-            sys.exit(0)
+    scores = scores_nn if len(scores_nn) > 0 else scores_rc
+    if not len(scores) == len(rBlock):
+        print("Score list length does not match the number of alignments")
+        print(scores_nn)
+        print(scores_rc, flush=True)
+        sys.exit(0)
+    total = np.sum(scores)
+    if total > 0:
+        percs = np.asarray(scores, dtype=float) / total
     else:
-        percs = scores_rc / np.sum(scores_rc)
+        #Every location scored zero, so there is nothing to prefer between them
+        percs = np.full(len(scores), 1.0/len(scores))
 
     #Picking read to allocate based on percentages
     #Seeded per read block from the read name, so the draw is a genuine sample from

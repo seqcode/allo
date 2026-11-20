@@ -21,8 +21,8 @@ import numpy as np
 def predictNN(counts, winSize, model):
     pic = np.zeros((100, 100), float)
     if sum(counts) == 0:
-        pred = model(pic.reshape(-1,100,100), training=False)
-        return pred.numpy()[0][0]
+        pred = model.predict(pic.reshape(-1,100,100))
+        return pred[0][0]
     binSize = math.floor(winSize/100)
     binTotal = math.floor(winSize/binSize)
     binned = []
@@ -34,7 +34,13 @@ def predictNN(counts, winSize, model):
         else:
             binned.append(np.sum(counts[position:position+binSize]))
   
-    binned = (99*(binned - np.min(binned))/np.ptp(binned)).astype(int) 
+    binned = np.asarray(binned)
+    spread = np.ptp(binned)
+    if spread == 0:
+        #Flat profile carries no shape information, so draw it along the bottom row
+        binned = np.zeros(len(binned), dtype=int)
+    else:
+        binned = (99*(binned - np.min(binned))/spread).astype(int)
     for i in range(0,len(binned)):
         pic[binned[i],i] = 1
     try:

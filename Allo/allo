@@ -196,31 +196,46 @@ if __name__ == '__main__':
     
     
     #Splitting up file
-    size = int(count/len(tempList))
+    #Never ask for more chunks than there are lines to fill them
+    if count < len(tempList):
+        tempList = tempList[:max(1, count)]
+    size = math.ceil(count/len(tempList))
     f = open(samfile)
     linec = 0
     i = 0
     filen = open(tempList[0], 'a')
     for line in f:
-        if linec <= size:
-            filen.write(line)
-            linec = linec + 1
-        else:
-            filen.write(line)
+        #Move to the next chunk once this one is full, while one is left to move to
+        if linec == size and i + 1 < len(tempList):
             filen.close()
-            linec = 0
             i = i + 1
+            linec = 0
             filen = open(tempList[i], 'a')
+        filen.write(line)
+        linec = linec + 1
     filen.close()
+    f.close()
+    #Later stages open every temp file, so any chunk left unwritten still has to exist
+    for t in tempList[i+1:]:
+        open(t, 'a').close()
 
         
     #Getting column where alignment score is stored in sam (different for every aligner). If none listed assumes bowtie1 -m 1 -k x
-    with open(tempList[-1]) as f:
-        for line in f:
-            if not line.startswith("@") and not line[2] == "*":
-                l = line
-                break
+    #Chunks can be empty, so keep looking back through them until a record turns up
+    l = None
+    for t in reversed(tempList):
+        with open(t) as f:
+            for line in f:
+                if not line.startswith("@") and not line[2] == "*":
+                    l = line
+                    break
+        if l is not None:
+            break
     AS = 0
+    if l is None:
+        print("No alignment records found in " + args.input)
+        shutil.rmtree(allo_dir)
+        sys.exit(1)
     l = l.split('\t')
     for i in range(0,len(l)):
         if l[i].startswith("AS:"):

@@ -145,6 +145,9 @@ def getArray(read, winSize, genLand, spliceD):
 
 #Assign reads (straight to dictionary for uniq and actual assign for multi-mapped)
 def readAssign(rBlock, samOut, winSize, genLand, model, cnn_scores, rc, rmz, spliceD):
+    #Nothing survived filtering, so there is nothing to allocate
+    if len(rBlock) == 0:
+        return
     ##Multi-mapped reads##
     ###CNN###
     scores_rc = []
@@ -706,6 +709,9 @@ def parseUniqPE(tempFile, winSize, cnn_scores, AS, rc, keep, r2):
 
 #Assign reads (straight to dictionary for uniq and actual assign for multi-mapped)
 def readAssignPE(rBlock, rBlock2, samOut, winSize, genLand, model, cnn_scores, rc, rmz, spliceD):
+    #Nothing survived filtering, so there is nothing to allocate
+    if len(rBlock) == 0 or len(rBlock2) == 0:
+        return
     ##Multi-mapped reads##
     ###CNN###
     scores_rc = []
@@ -832,6 +838,12 @@ def parseMultiPE(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rm
            #Just adding to arrays if it's the same read
             if curRead == r[0]:
                 if numR == 1 and numL == 1:
+                    #Drop the pair if either mate is filtered out
+                    if keep == 0 and (r[2] == "*" or "N" in r[9] or \
+                                      rBlock[-1][2] == "*" or "N" in rBlock[-1][9]):
+                        rBlock.pop()
+                        numL = numL + 1
+                        continue
                     rBlock2.append(r)
                     numL = numL + 1
                     continue
@@ -839,11 +851,13 @@ def parseMultiPE(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rm
                     rBlock.append(r)
                     numL = numL + 1  
                 else:
-                    #Exceptions that cause errors
+                    #Drop the pair if either mate is filtered out. Only R1 of this pair
+                    #has been added so far, so that is all there is to take back off.
                     if keep == 0:
-                        if r[2] == "*" or "N" in r[9]:
+                        if r[2] == "*" or "N" in r[9] or rBlock[-1][2] == "*" or "N" in rBlock[-1][9]:
                             rBlock.pop()
-                            rBlock2.pop()
+                            numL = numL + 1
+                            continue
                     #Making sure pairs are correctly together
                     r2chr = rBlock[-1][6]
                     if r2chr == "=":
@@ -860,6 +874,14 @@ def parseMultiPE(tempFile, winSize, genLand, modelName, cnn_scores, rc, keep, rm
             #If different read, begin read assignment
             else:
                 if maxa is not None and len(rBlock) > maxa:
+                    #Skip this block, but start the next read, or every later read in
+                    #this chunk keeps hitting this branch against a block never cleared
+                    rBlock = []
+                    rBlock2 = []
+                    rBlock.append(r)
+                    curRead = r[0]
+                    numR = numR + 1
+                    numL = 1
                     continue
                 readAssignPE(rBlock, rBlock2, AL, winSize, genLand, model, cnn_scores, rc, rmz, spliceD)
                 numLoc[0] = (numLoc[0]*numLoc[1] + len(rBlock)) / (numLoc[1]+1)
